@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VerseDeck.App/VerseDeck.App.csproj" />
+    <Project Path="src/VerseDeck.Core/VerseDeck.Core.csproj" />
+    <Project Path="src/VerseDeck.Data/VerseDeck.Data.csproj" />
+    <Project Path="src/VerseDeck.Input/VerseDeck.Input.csproj" />
+    <Project Path="src/VerseDeck.Market/VerseDeck.Market.csproj" />
+    <Project Path="src/VerseDeck.MobileServer/VerseDeck.MobileServer.csproj" />
+    <Project Path="src/VerseDeck.Voice/VerseDeck.Voice.csproj" />
+  </Folder>
+</Solution>

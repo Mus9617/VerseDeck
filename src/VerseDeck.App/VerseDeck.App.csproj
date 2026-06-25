@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VerseDeck.Core\VerseDeck.Core.csproj" />
+    <ProjectReference Include="..\VerseDeck.Data\VerseDeck.Data.csproj" />
+    <ProjectReference Include="..\VerseDeck.Input\VerseDeck.Input.csproj" />
+    <ProjectReference Include="..\VerseDeck.Voice\VerseDeck.Voice.csproj" />
+    <ProjectReference Include="..\VerseDeck.MobileServer\VerseDeck.MobileServer.csproj" />
+    <ProjectReference Include="..\VerseDeck.Market\VerseDeck.Market.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\icon.png" Link="icon.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\ready.mp3" Link="ready.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\system.mp3" Link="system.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Skin\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\VideoUi\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>

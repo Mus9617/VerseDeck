@@ -1,0 +1,49 @@
+{
+  "pack": "VerseDeck Companion UI Skin Pack",
+  "version": "1.0",
+  "generated_for": "Windows WPF desktop companion app",
+  "license_note": "Original AI-generated fan-made assets. No Star Citizen, RSI, CIG, or copyrighted logos/assets included intentionally.",
+  "folders": {
+    "backgrounds": "Main 2560x1440 app background",
+    "frames": "Header, side panels, module panel, MFD frame",
+    "buttons": "12 sliced button frame states, 600x180",
+    "status": "3 sliced status chips, 320x72",
+    "qr": "QR scanner frame, 420x420",
+    "icons/png": "16 generated PNG icons, 256x256",
+    "icons/svg": "16 simple original SVG line icons, 256 viewBox",
+    "overlays": "Transparent decorative overlays",
+    "raw_generated": "Original unsliced generated images"
+  },
+  "button_order": [
+    "button_normal_cyan",
+    "button_hover_cyan",
+    "button_pressed_cyan",
+    "button_normal_amber",
+    "button_hover_amber",
+    "button_pressed_amber",
+    "button_normal_green",
+    "button_hover_green",
+    "button_pressed_green",
+    "button_normal_red",
+    "button_hover_red",
+    "button_pressed_red"
+  ],
+  "icons": [
+    "flight_ready",
+    "power",
+    "engines",
+    "landing_gear",
+    "lights",
+    "radar",
+    "scan",
+    "quantum_jump",
+    "star_map",
+    "shields",
+    "weapons",
+    "doors",
+    "cargo",
+    "comms",
+    "eject",
+    "self_destruct"
+  ]
+}

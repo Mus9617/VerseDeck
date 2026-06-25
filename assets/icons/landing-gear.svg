@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Landing gear">
+  <path d="M32 8v28" fill="none" stroke="#29D9FF" stroke-width="4" stroke-linecap="round"/>
+  <path d="M18 38h28" fill="none" stroke="#29D9FF" stroke-width="4" stroke-linecap="round"/>
+  <path d="M22 38l-8 14M42 38l8 14" fill="none" stroke="#9BEFFF" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="12" cy="54" r="5" fill="none" stroke="#EAFBFF" stroke-width="3"/>
+  <circle cx="52" cy="54" r="5" fill="none" stroke="#EAFBFF" stroke-width="3"/>
+  <path d="M24 12h16l-8-6z" fill="#29D9FF" opacity=".35"/>
+</svg>
