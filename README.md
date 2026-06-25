@@ -7,8 +7,8 @@
 Botonera companion para Windows inspirada en Star Citizen, con controles manuales, voz local Push-to-Talk y panel movil LAN.
 
 Autor: **Zowix**
-
-Tutorial: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+Docu: https://verse-page.vercel.app/
+Tutorial: https://www.youtube.com/watch?v=zvlNAomh1F4
 
 ## Source code
 
