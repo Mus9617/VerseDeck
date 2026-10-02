@@ -1,0 +1,34 @@
+<ActionMaps>
+ <ActionProfiles version="1" optionsVersion="2" rebindVersion="2" profileName="default">
+  <options type="keyboard" instance="1" Product="Teclado  {6F1D2B61-D5A0-11CF-BFC7-444553540000}"/>
+  <options type="gamepad" instance="1" Product="Controller (Gamepad)"/>
+  <options type="joystick" instance="1"/>
+  <options type="joystick" instance="2"/>
+  <options type="joystick" instance="3"/>
+  <options type="joystick" instance="4"/>
+  <options type="joystick" instance="5"/>
+  <options type="joystick" instance="6"/>
+  <options type="joystick" instance="7"/>
+  <options type="joystick" instance="8"/>
+  <modifiers />
+  <actionmap name="spaceship_movement">
+   <action name="v_autoland">
+    <rebind input="kb1_lctrl+n"/>
+   </action>
+   <action name="v_lock_rotation">
+    <rebind input="kb1_mouse5"/>
+   </action>
+   <action name="v_strafe_forward">
+    <rebind input="js1_slider1"/>
+   </action>
+   <action name="v_toggle_relative_mouse_mode">
+    <rebind input="kb1_comma"/>
+   </action>
+  </actionmap>
+  <actionmap name="player_input_optical_tracking">
+   <action name="foip_pushtotalk_proximity">
+    <rebind input="kb1_backslash"/>
+   </action>
+  </actionmap>
+ </ActionProfiles>
+</ActionMaps>
