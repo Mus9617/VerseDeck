@@ -80,7 +80,7 @@ public sealed partial class ControlsViewModel : ObservableObject
     private async Task SyncAsync()
     {
         await _sync.SyncAsync();
-        if (_sync.Install is null)
+        if (_sync.Install is null || _sync.Failed)
         {
             _status.Error(_sync.FileStatus);
         }

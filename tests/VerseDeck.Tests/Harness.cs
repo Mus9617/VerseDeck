@@ -176,6 +176,7 @@ public sealed class Harness : IAsyncDisposable
     public FakeMobileLink Mobile { get; } = new();
     public List<ThemeId> AppliedThemes { get; } = [];
     public int DebugConsoleOpens { get; private set; }
+    public int InputDrains { get; private set; }
     public FakeGameFolder? Game { get; private set; }
     public FakeFileWatch Watch { get; } = new();
     public ControlSync ControlSync { get; private set; } = null!;
@@ -219,7 +220,12 @@ public sealed class Harness : IAsyncDisposable
             () => harness.DebugConsoleOpens++,
             harness.ControlSync,
             catalog,
-            () => harness.Now));
+            () => harness.Now,
+            () =>
+            {
+                harness.InputDrains++;
+                return Task.CompletedTask;
+            }));
         if (initialize)
         {
             await harness.Shell.InitializeAsync();

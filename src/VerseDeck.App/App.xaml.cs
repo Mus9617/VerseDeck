@@ -61,7 +61,8 @@ public partial class App : Application
             new ThemeService(ApplyTheme),
             () => OpenDebugConsole(log),
             controlSync,
-            catalog));
+            catalog,
+            DrainInput: inputSender.WhenIdleAsync));
     }
 
     private void ApplyTheme(ThemeId theme)

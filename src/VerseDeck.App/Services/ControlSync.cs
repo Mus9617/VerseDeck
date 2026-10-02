@@ -6,18 +6,21 @@ namespace VerseDeck.App.Services;
 
 public interface IFileWatch
 {
-    /// <summary>Calls back, possibly from another thread and several times per save, when the file changes.</summary>
-    IDisposable Watch(string path, Action changed);
+    /// <summary>
+    /// Watches one file. <paramref name="changed"/> may be called from another thread and several times per save;
+    /// <paramref name="lost"/> is called if the watch stops working. Returns null when the folder does not exist yet.
+    /// </summary>
+    IDisposable? Watch(string path, Action changed, Action lost);
 }
 
 public sealed class FileWatch : IFileWatch
 {
-    public IDisposable Watch(string path, Action changed)
+    public IDisposable? Watch(string path, Action changed, Action lost)
     {
-        var folder = Path.GetDirectoryName(path)!;
-        if (!Directory.Exists(folder))
+        var folder = Path.GetDirectoryName(path);
+        if (folder is null || !Directory.Exists(folder))
         {
-            return new Nothing();
+            return null;
         }
 
         var watcher = new FileSystemWatcher(folder, Path.GetFileName(path))
@@ -26,16 +29,13 @@ public sealed class FileWatch : IFileWatch
         };
         watcher.Changed += (_, _) => changed();
         watcher.Created += (_, _) => changed();
+        watcher.Deleted += (_, _) => changed();
         watcher.Renamed += (_, _) => changed();
+
+        // Raised when the watched folder is removed, which players do to reset their settings after a patch.
+        watcher.Error += (_, _) => lost();
         watcher.EnableRaisingEvents = true;
         return watcher;
-    }
-
-    private sealed class Nothing : IDisposable
-    {
-        public void Dispose()
-        {
-        }
     }
 }
 
@@ -76,6 +76,7 @@ public sealed class ControlSync
 
     public GameInstall? Install { get; private set; }
     public string FileStatus { get; private set; } = "Sin leer";
+    public bool Failed { get; private set; }
     public IReadOnlyList<GameRebind> Rebinds { get; private set; } = [];
     public IReadOnlyList<ModuleLink> Links { get; private set; } = [];
 
@@ -104,10 +105,13 @@ public sealed class ControlSync
                 await SyncCoreAsync();
             }
             while (_again);
+
+            Failed = false;
         }
         catch (Exception ex)
         {
             _log.Write($"Controls sync failed: {ex}");
+            Failed = true;
             FileStatus = $"No se pudo sincronizar: {ex.Message}";
         }
         finally
@@ -121,7 +125,15 @@ public sealed class ControlSync
     private async Task SyncCoreAsync()
     {
         var configured = _session.Settings.GameFolder;
+        var previousPath = Install?.ActionMapsPath;
         Install = _locator.Locate(configured);
+        if (!string.Equals(previousPath, Install?.ActionMapsPath, StringComparison.OrdinalIgnoreCase))
+        {
+            // What was read belongs to the previous folder.
+            Rebinds = [];
+            _hasGoodRead = false;
+        }
+
         WatchFile(Install?.ActionMapsPath);
 
         var canApply = false;
@@ -133,11 +145,19 @@ public sealed class ControlSync
         }
         else if (!File.Exists(Install.ActionMapsPath))
         {
-            // The game only writes the file once the player changes a bind.
-            Rebinds = [];
-            _hasGoodRead = true;
-            canApply = true;
-            FileStatus = "Sin rebinds: el juego aun no ha creado actionmaps.xml.";
+            if (_hasGoodRead)
+            {
+                // The file was there a moment ago: it is being replaced, so keep what was read.
+                FileStatus = "actionmaps.xml no esta ahora mismo; se conservan los ultimos rebinds leidos.";
+            }
+            else
+            {
+                // The game only writes the file once the player changes a bind.
+                Rebinds = [];
+                _hasGoodRead = true;
+                canApply = true;
+                FileStatus = "Sin rebinds: el juego aun no ha creado actionmaps.xml.";
+            }
         }
         else
         {
@@ -188,14 +208,16 @@ public sealed class ControlSync
 
     private void WatchFile(string? path)
     {
-        if (string.Equals(path, _watchedPath, StringComparison.OrdinalIgnoreCase))
+        if (_watcher is not null && string.Equals(path, _watchedPath, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
         _watcher?.Dispose();
-        _watchedPath = path;
-        _watcher = path is null ? null : _watch.Watch(path, () => _ui.Post(OnFileChanged));
+        _watcher = path is null ? null : _watch.Watch(path, () => _ui.Post(OnFileChanged), () => _ui.Post(OnWatchLost));
+
+        // Remembered only when the watch really started, so a folder that appears later gets watched then.
+        _watchedPath = _watcher is null ? null : path;
     }
 
     // The game writes the file in several steps; wait until it has been quiet for a moment.
@@ -203,6 +225,14 @@ public sealed class ControlSync
     {
         _debounce?.Dispose();
         _debounce = _ui.After(Debounce, () => Pending = SyncAsync());
+    }
+
+    private void OnWatchLost()
+    {
+        _watcher?.Dispose();
+        _watcher = null;
+        _watchedPath = null;
+        OnFileChanged();
     }
 
     private static bool SameAction(KeyPressAction a, KeyPressAction b)

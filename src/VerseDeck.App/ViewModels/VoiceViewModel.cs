@@ -326,14 +326,7 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     private static bool IsSupportedKey(string key)
     {
-        try
-        {
-            KeyMap.ToVirtualKey(key);
-            return true;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            return false;
-        }
+        // Push-to-talk is polled by virtual key; keys that are only sent by scan code have none.
+        return KeyMap.IsSupported(key) && KeyMap.ToVirtualKey(key) != 0;
     }
 }

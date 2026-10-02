@@ -123,6 +123,13 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
+        // A long hold belongs to the game action that needs it, not to the module that was linked to it.
+        var selectedId = SelectedGameAction?.Id ?? string.Empty;
+        if (IsLinked && !selectedId.Equals(_button.GameAction, StringComparison.OrdinalIgnoreCase))
+        {
+            action = action with { PressDurationMs = ManualPressMs };
+        }
+
         await RunAsync(async () =>
         {
             await _session.SaveButtonAsync(_button with

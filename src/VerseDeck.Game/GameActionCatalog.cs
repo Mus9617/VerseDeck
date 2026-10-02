@@ -92,6 +92,8 @@ public static class BindingResolver
             .Where(r => names.Contains(r.Action, StringComparer.OrdinalIgnoreCase))
             .Where(r => entry is not null || r.ActionMap.Equals(map, StringComparison.OrdinalIgnoreCase))
             .Where(r => r.Input.Device is ScDevice.Keyboard or ScDevice.Mouse or ScDevice.Unknown)
+            // An action of the same name in another map must not win over the one in the expected map.
+            .OrderByDescending(r => r.ActionMap.Equals(map, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (candidates.Count == 0)

@@ -98,6 +98,7 @@ public sealed partial class GameInstallLocator
         }
     }
 
-    [GeneratedRegex(@"Launching Star Citizen LIVE from \((.+?)\)")]
+    // Greedy on purpose: the folder itself may contain parentheses, as in "Program Files (x86)".
+    [GeneratedRegex(@"Launching Star Citizen LIVE from \((.+)\)")]
     private static partial Regex LaunchLine();
 }

@@ -178,7 +178,8 @@ public sealed record ShellServices(
     Action OpenDebugConsole,
     ControlSync ControlSync,
     GameActionCatalog Catalog,
-    Func<DateTimeOffset>? Clock = null);
+    Func<DateTimeOffset>? Clock = null,
+    Func<Task>? DrainInput = null);
 
 public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 {
@@ -259,6 +260,13 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         _refreshTimer?.Dispose();
         await Voice.StopCommand.ExecuteAsync(null);
         await Mobile.StopCommand.ExecuteAsync(null);
+
+        // A long press may still be holding its key; closing now would leave it down in Windows.
+        if (_services.DrainInput is not null)
+        {
+            await _services.DrainInput();
+        }
+
         _services.Log.Write("App closing");
     }
 

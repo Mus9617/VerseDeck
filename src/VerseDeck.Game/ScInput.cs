@@ -34,14 +34,14 @@ public sealed partial record ScInput(ScDevice Device, int Instance, IReadOnlyLis
             _ => ScDevice.Unknown
         };
         var instance = int.Parse(match.Groups[2].Value);
-        var rest = match.Groups[3].Value.Trim();
-        if (rest.Length == 0)
+
+        // In "lctrl+n" the last element is the key and the ones before it are held with it.
+        var parts = match.Groups[3].Value.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
         {
             return new ScInput(device, instance, [], string.Empty, true, raw!);
         }
 
-        // In "lctrl+n" the last element is the key and the ones before it are held with it.
-        var parts = rest.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var key = parts[^1];
         if (device == ScDevice.Keyboard && MousePattern().IsMatch(key))
         {
@@ -56,6 +56,15 @@ public sealed partial record ScInput(ScDevice Device, int Instance, IReadOnlyLis
     {
         action = KeyPressAction.DefaultLandingGear;
         if (Device != ScDevice.Keyboard || IsUnbound || !KeyMap.IsSupported(Key))
+        {
+            return false;
+        }
+
+        // The game never writes these; a hand-edited file must not turn into a mouse click, a raw
+        // virtual key or the same modifier twice.
+        if (Key.StartsWith("MOUSE_", StringComparison.OrdinalIgnoreCase)
+            || Key.StartsWith("VK_", StringComparison.OrdinalIgnoreCase)
+            || Modifiers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != Modifiers.Count)
         {
             return false;
         }
@@ -79,7 +88,7 @@ public sealed partial record ScInput(ScDevice Device, int Instance, IReadOnlyLis
         return KeyNames.TryGetValue(name, out var mapped) ? mapped : name.ToUpperInvariant();
     }
 
-    [GeneratedRegex(@"^(kb|mo|js|gp)(\d+)_(.*)$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(kb|mo|js|gp)([0-9]{1,4})_(.*)$", RegexOptions.IgnoreCase)]
     private static partial Regex InputPattern();
 
     [GeneratedRegex(@"^(mouse\d+|mwheel_\w+|maxis_\w+)$", RegexOptions.IgnoreCase)]

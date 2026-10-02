@@ -56,6 +56,13 @@ public sealed class WindowsInputSender : IInputSender
         }
     }
 
+    /// <summary>Completes once no key is being held, so the app can close without leaving one down.</summary>
+    public async Task WhenIdleAsync()
+    {
+        await _gate.WaitAsync();
+        _gate.Release();
+    }
+
     private static ushort ScanCodeOf(ushort virtualKey) => (ushort)MapVirtualKey(virtualKey, 0);
 
     private static void Send(IReadOnlyList<KeyStroke> strokes)

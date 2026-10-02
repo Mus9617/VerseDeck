@@ -16,7 +16,8 @@ public static class ActionMapsReader
         {
             // The game may be writing the file; never ask for exclusive access.
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            var document = XDocument.Load(stream);
+            using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+            var document = XDocument.Load(reader);
             if (document.Root?.Name.LocalName != "ActionMaps")
             {
                 return Failed("El archivo no es un actionmaps.xml de Star Citizen.");
@@ -51,6 +52,11 @@ public static class ActionMapsReader
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return Failed($"No se puede abrir actionmaps.xml: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            // Reading the player's file must never take the app down, whatever it contains.
+            return Failed($"No se pudo interpretar actionmaps.xml: {ex.Message}");
         }
     }
 

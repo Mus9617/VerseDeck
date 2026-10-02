@@ -12,19 +12,32 @@ public sealed class FakeFileWatch : IFileWatch
     }
 
     private Action? _changed;
+    private Action? _lost;
 
     public string? WatchedPath { get; private set; }
     public int WatchCount { get; private set; }
 
-    public IDisposable Watch(string path, Action changed)
+    /// <summary>Makes the next Watch call behave as if the folder did not exist yet.</summary>
+    public bool FailNextWatch { get; set; }
+
+    public IDisposable? Watch(string path, Action changed, Action lost)
     {
+        if (FailNextWatch)
+        {
+            FailNextWatch = false;
+            return null;
+        }
+
         WatchedPath = path;
         WatchCount++;
         _changed = changed;
+        _lost = lost;
         return new Handle(() => _changed = null);
     }
 
     public void Trigger() => _changed?.Invoke();
+
+    public void Lose() => _lost?.Invoke();
 }
 
 /// <summary>A throwaway Star Citizen channel folder containing only what VerseDeck reads.</summary>
