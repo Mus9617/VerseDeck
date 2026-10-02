@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using VerseDeck.Core.Models;
 
 namespace VerseDeck.MobileServer;
@@ -18,7 +19,7 @@ public sealed class MobilePanelServer : IAsyncDisposable
     private readonly IVerseDeckRepository _repository;
     private readonly IInputSender _inputSender;
     private readonly ConcurrentDictionary<string, ConnectedDevice> _devices = new();
-    private IHost? _host;
+    private WebApplication? _host;
 
     public MobilePanelServer(IVerseDeckRepository repository, IInputSender inputSender)
     {
@@ -38,21 +39,61 @@ public sealed class MobilePanelServer : IAsyncDisposable
             return;
         }
 
+        var guard = new PairingGuard(pairingPin, () => DateTimeOffset.Now);
         var builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
         builder.WebHost.UseKestrel(options => options.ListenAnyIP(port));
         var app = builder.Build();
         app.UseWebSockets();
 
-        app.MapGet("/", () => Results.Content(MobileHtml(port, pairingPin), "text/html; charset=utf-8"));
+        // Every route is LAN-only; everything except the page and pairing also needs a paired token.
+        app.Use(async (context, next) =>
+        {
+            if (!IsPrivateLan(context.Connection.RemoteIpAddress))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
+            }
+
+            var path = context.Request.Path;
+            var needsToken = path.StartsWithSegments("/ws")
+                || path.StartsWithSegments("/api") && !path.StartsWithSegments("/api/pair");
+            if (needsToken && !guard.IsValidToken(TokenOf(context.Request)))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            await next(context);
+        });
+
+        app.MapGet("/", () => Results.Content(MobilePage.Html, "text/html; charset=utf-8"));
         app.MapGet("/manifest.json", () => Results.Json(new
         {
             name = "VerseDeck Companion",
             short_name = "VerseDeck",
             start_url = "/",
             display = "standalone",
-            background_color = "#061017",
-            theme_color = "#29D9FF"
+            background_color = "#0E1317",
+            theme_color = "#5FB8C9"
         }));
+
+        app.MapPost("/api/pair", (PairRequest request, HttpContext context) =>
+        {
+            var remote = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var result = guard.TryPair(remote, request.Pin);
+            if (result.Status != PairStatus.Ok)
+            {
+                Diagnostic?.Invoke(this, $"Mobile pairing rejected from {remote}: {result.Status}");
+            }
+
+            return result.Status switch
+            {
+                PairStatus.Ok => Results.Json(new { token = result.Token }),
+                PairStatus.LockedOut => Results.StatusCode(StatusCodes.Status429TooManyRequests),
+                _ => Results.StatusCode(StatusCodes.Status401Unauthorized)
+            };
+        });
 
         app.MapGet("/api/buttons", async () =>
         {
@@ -87,27 +128,40 @@ public sealed class MobilePanelServer : IAsyncDisposable
 
         app.Map("/ws", async context =>
         {
-            if (!context.WebSockets.IsWebSocketRequest || !IsPrivateLan(context.Connection.RemoteIpAddress))
+            if (!context.WebSockets.IsWebSocketRequest)
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return;
-            }
-
-            if (context.Request.Query["pin"] != pairingPin)
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
                 return;
             }
 
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             var id = Guid.NewGuid().ToString("N");
             _devices[id] = new ConnectedDevice(id, "Mobile browser", context.Connection.RemoteIpAddress?.ToString() ?? "unknown", DateTimeOffset.Now);
-            await ReceiveLoop(socket, cancellationToken);
-            _devices.TryRemove(id, out _);
+            try
+            {
+                await ReceiveLoop(socket, cancellationToken);
+            }
+            catch (WebSocketException)
+            {
+                // The phone dropped off the network without closing the socket.
+            }
+            finally
+            {
+                _devices.TryRemove(id, out _);
+            }
         });
 
+        try
+        {
+            await app.StartAsync(cancellationToken);
+        }
+        catch
+        {
+            await app.DisposeAsync();
+            throw;
+        }
+
         _host = app;
-        await app.StartAsync(cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
@@ -118,7 +172,7 @@ public sealed class MobilePanelServer : IAsyncDisposable
         }
 
         await _host.StopAsync(cancellationToken);
-        _host.Dispose();
+        await _host.DisposeAsync();
         _host = null;
         _devices.Clear();
     }
@@ -126,6 +180,17 @@ public sealed class MobilePanelServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopAsync();
+    }
+
+    private static string? TokenOf(HttpRequest request)
+    {
+        var header = request.Headers.Authorization.ToString();
+        if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return header["Bearer ".Length..].Trim();
+        }
+
+        return request.Query["token"];
     }
 
     private async Task ReceiveLoop(WebSocket socket, CancellationToken cancellationToken)
@@ -139,8 +204,16 @@ public sealed class MobilePanelServer : IAsyncDisposable
                 break;
             }
 
-            var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-            var request = JsonSerializer.Deserialize<MobileActionRequest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            MobileActionRequest? request;
+            try
+            {
+                request = JsonSerializer.Deserialize<MobileActionRequest>(buffer.AsSpan(0, result.Count), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
             if (request?.Type == "press")
             {
                 try
@@ -161,11 +234,12 @@ public sealed class MobilePanelServer : IAsyncDisposable
     private async Task PressButton(long buttonId, bool confirmed, CancellationToken cancellationToken)
     {
         var profile = (await _repository.GetProfilesAsync(cancellationToken)).First(p => p.IsActive);
-        var button = (await _repository.GetButtonsAsync(profile.Id, cancellationToken)).First(b => b.Id == buttonId);
+        var button = (await _repository.GetButtonsAsync(profile.Id, cancellationToken)).FirstOrDefault(b => b.Id == buttonId)
+            ?? throw new InvalidOperationException("Modulo no encontrado");
         if (button.RequiresConfirmation && !confirmed)
         {
             await _repository.AddCommandLogAsync("Mobile", button.Name, "Rejected: confirmation required", cancellationToken);
-            return;
+            throw new InvalidOperationException("Confirmacion requerida");
         }
 
         await _inputSender.SendAsync(button.Action, cancellationToken);
@@ -183,6 +257,11 @@ public sealed class MobilePanelServer : IAsyncDisposable
         if (IPAddress.IsLoopback(address))
         {
             return true;
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6 && !address.IsIPv4MappedToIPv6)
+        {
+            return address.IsIPv6LinkLocal || address.IsIPv6UniqueLocal;
         }
 
         var bytes = address.MapToIPv4().GetAddressBytes();
@@ -223,87 +302,7 @@ public sealed class MobilePanelServer : IAsyncDisposable
         return candidates.OrderByDescending(c => c.Score).FirstOrDefault().Address?.ToString() ?? "127.0.0.1";
     }
 
-    private static string MobileHtml(int port, string pin) => $$"""
-    <!doctype html>
-    <html lang="es">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="manifest" href="/manifest.json">
-      <title>VerseDeck Companion</title>
-      <style>
-        :root { color-scheme: dark; --accent:#38E8FF; --bg:#02040A; }
-        * { box-sizing:border-box; } body { margin:0; min-height:100vh; font-family:Segoe UI,Arial,sans-serif; background:linear-gradient(135deg,#07121B,#02040A 52%,#100B07); color:#EAFBFF; }
-        main { padding:16px; max-width:920px; margin:0 auto; }
-        header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid rgba(56,232,255,.28); }
-        h1 { font-size:24px; margin:0; letter-spacing:0; } .sub { color:#84AEB8; font-size:12px; margin-top:4px; }
-        .status { color:var(--accent); font-size:12px; font-weight:700; border:1px solid rgba(56,232,255,.4); border-radius:5px; padding:8px 10px; background:rgba(5,16,21,.72); }
-        .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-        button { min-height:112px; text-align:left; border:1px solid color-mix(in srgb,var(--accent),transparent 28%); border-radius:5px; color:#EAFBFF; background:linear-gradient(145deg,color-mix(in srgb,var(--accent),transparent 72%),rgba(3,13,18,.92)); box-shadow:0 0 20px color-mix(in srgb,var(--accent),transparent 86%), inset 0 0 18px rgba(255,255,255,.04); padding:12px; font-weight:700; }
-        button:active { transform:translateY(1px); filter:brightness(1.2); }
-        .cat { color:#84AEB8; font-size:10px; display:block; margin-bottom:18px; }
-        .name { font-size:18px; display:block; line-height:1.08; }
-        .key { display:block; margin-top:12px; color:var(--accent); font-size:12px; font-weight:700; }
-        @media (min-width:760px) { .grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-      </style>
-    </head>
-    <body>
-      <main>
-        <header><div><h1>VERSEDECK</h1><div class="sub">Manual MFD link - LAN only</div></div><span class="status" id="status">Conectando</span></header>
-        <section class="grid" id="buttons"></section>
-      </main>
-      <script>
-        const status = document.getElementById('status');
-        const buttons = document.getElementById('buttons');
-        const ws = new WebSocket(`ws://${location.host}/ws?pin={{pin}}`);
-        ws.onopen = () => status.textContent = 'LAN conectado';
-        ws.onclose = () => status.textContent = 'Desconectado';
-        ws.onerror = () => status.textContent = 'Error';
-        ws.onmessage = event => {
-          try {
-            const data = JSON.parse(event.data);
-            status.textContent = data.ok ? 'Comando enviado' : `Error: ${data.error || 'no enviado'}`;
-          } catch { }
-        };
-        async function loadButtons() {
-          const data = await (await fetch('/api/buttons')).json();
-          buttons.innerHTML = '';
-          for (const item of data) {
-            const el = document.createElement('button');
-            el.style.setProperty('--accent', item.accentColor);
-            el.innerHTML = `<span class="cat">${item.category}</span><span class="name">${item.name}</span><span class="key">${item.key}${item.requiresConfirmation ? ' / CONFIRM' : ''}</span>`;
-            el.onclick = async () => {
-              if (item.requiresConfirmation && !confirm(`Ejecutar ${item.name}?`)) return;
-              if (navigator.vibrate) navigator.vibrate(28);
-              const payload = { type:'press', buttonId:item.id, confirmed:item.requiresConfirmation };
-              try {
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify(payload));
-                  status.textContent = 'Enviando';
-                  return;
-                }
-              } catch { }
-
-              try {
-                const response = await fetch('/api/press', {
-                  method:'POST',
-                  headers:{ 'Content-Type':'application/json' },
-                  body: JSON.stringify(payload)
-                });
-                const data = await response.json();
-                status.textContent = data.ok ? 'Comando enviado' : `Error: ${data.error || 'no enviado'}`;
-              } catch (error) {
-                status.textContent = `Error: ${error.message}`;
-              }
-            };
-            buttons.appendChild(el);
-          }
-        }
-        loadButtons();
-      </script>
-    </body>
-    </html>
-    """;
+    private sealed record PairRequest(string? Pin);
 
     private sealed record MobileActionRequest(string Type, long ButtonId, bool Confirmed);
 }
