@@ -86,6 +86,7 @@ public interface IVerseDeckRepository
     Task<Profile> SaveProfileAsync(Profile profile, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DeckButton>> GetButtonsAsync(long profileId, CancellationToken cancellationToken = default);
     Task<DeckButton> SaveButtonAsync(DeckButton button, CancellationToken cancellationToken = default);
+    Task DeleteButtonAsync(long buttonId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<VoiceCommand>> GetVoiceCommandsAsync(CancellationToken cancellationToken = default);
     Task<VoiceCommand> SaveVoiceCommandAsync(VoiceCommand command, CancellationToken cancellationToken = default);
     Task AddCommandLogAsync(string source, string command, string result, CancellationToken cancellationToken = default);

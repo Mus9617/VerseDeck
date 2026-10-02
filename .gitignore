@@ -33,3 +33,5 @@ logs/
 *.temp
 *.bak
 *.cache
+
+.superpowers/

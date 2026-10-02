@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using VerseDeck.Core.Models;
@@ -107,11 +108,11 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         }
 
         return new AppSettings(
-            int.Parse(values.GetValueOrDefault("MobilePort", "4785")),
+            int.Parse(values.GetValueOrDefault("MobilePort", "4785"), CultureInfo.InvariantCulture),
             values.GetValueOrDefault("PairingPin", "2468"),
             bool.Parse(values.GetValueOrDefault("VoiceEnabled", "False")),
             values.GetValueOrDefault("Theme", "ColdBlue"),
-            double.Parse(values.GetValueOrDefault("VoiceMinimumConfidence", "0.40")),
+            ParseConfidence(values.GetValueOrDefault("VoiceMinimumConfidence", "0.40")),
             values.GetValueOrDefault("VoiceActivationMode", "PushToTalk"),
             values.GetValueOrDefault("PushToTalkDevice", "Keyboard"),
             values.GetValueOrDefault("PushToTalkBinding", "F13"),
@@ -122,11 +123,11 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken);
-        await UpsertSetting(connection, "MobilePort", settings.MobilePort.ToString(), cancellationToken);
+        await UpsertSetting(connection, "MobilePort", settings.MobilePort.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await UpsertSetting(connection, "PairingPin", settings.PairingPin, cancellationToken);
         await UpsertSetting(connection, "VoiceEnabled", settings.VoiceEnabled.ToString(), cancellationToken);
         await UpsertSetting(connection, "Theme", settings.Theme, cancellationToken);
-        await UpsertSetting(connection, "VoiceMinimumConfidence", settings.VoiceMinimumConfidence.ToString("0.00"), cancellationToken);
+        await UpsertSetting(connection, "VoiceMinimumConfidence", settings.VoiceMinimumConfidence.ToString("0.00", CultureInfo.InvariantCulture), cancellationToken);
         await UpsertSetting(connection, "VoiceActivationMode", settings.VoiceActivationMode, cancellationToken);
         await UpsertSetting(connection, "PushToTalkDevice", settings.PushToTalkDevice, cancellationToken);
         await UpsertSetting(connection, "PushToTalkBinding", settings.PushToTalkBinding, cancellationToken);
@@ -352,15 +353,20 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
 
         await ApplyOneTimeDefaultsAsync(connection, cancellationToken);
 
-        var existingButtons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
-        var existingVoice = await repo.GetVoiceCommandsAsync(cancellationToken);
-
-        foreach (var preset in DefaultButtonPresets)
+        var seeded = connection.CreateCommand();
+        seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{DefaultDeckSeededKey}'";
+        if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
-            var button = existingButtons.FirstOrDefault(b => b.Name.Equals(preset.Name, StringComparison.OrdinalIgnoreCase));
-            if (button is null)
+            return;
+        }
+
+        // Databases created before the seed marker existed already hold the user's deck.
+        var existingButtons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
+        if (existingButtons.Count == 0)
+        {
+            foreach (var preset in DefaultButtonPresets)
             {
-                button = await repo.SaveButtonAsync(new DeckButton(
+                var button = await repo.SaveButtonAsync(new DeckButton(
                     0,
                     profile.Id,
                     preset.Name,
@@ -370,17 +376,25 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
                     preset.Action,
                     preset.RequiresConfirmation,
                     true), cancellationToken);
-            }
 
-            foreach (var phrase in preset.Phrases)
-            {
-                if (!existingVoice.Any(v => v.ButtonId == button.Id && v.Phrase.Equals(phrase, StringComparison.OrdinalIgnoreCase)))
+                foreach (var phrase in preset.Phrases)
                 {
                     await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
                 }
             }
         }
+
+        await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
     }
+
+    private static double ParseConfidence(string text)
+    {
+        return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value is >= 0.1 and <= 0.98
+            ? value
+            : 0.40;
+    }
+
+    private const string DefaultDeckSeededKey = "DefaultDeckSeededV1";
 
     private static async Task ApplyOneTimeDefaultsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {

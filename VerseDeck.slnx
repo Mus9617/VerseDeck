@@ -8,4 +8,7 @@
     <Project Path="src/VerseDeck.MobileServer/VerseDeck.MobileServer.csproj" />
     <Project Path="src/VerseDeck.Voice/VerseDeck.Voice.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VerseDeck.Tests/VerseDeck.Tests.csproj" />
+  </Folder>
 </Solution>
