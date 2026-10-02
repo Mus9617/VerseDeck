@@ -7,7 +7,12 @@ namespace VerseDeck.Speech;
 /// Downloads a voice model on the player's request. This is the only code in VerseDeck's copilot that
 /// uses the network, and a voice only counts as installed once the whole archive verified and extracted.
 /// </summary>
-public sealed class VoiceInstaller
+public interface IVoiceInstaller
+{
+    Task InstallAsync(VoiceInfo voice, IProgress<double>? progress, CancellationToken cancellationToken);
+}
+
+public sealed class VoiceInstaller : IVoiceInstaller
 {
     private readonly HttpClient _http;
     private readonly VoiceStore _store;

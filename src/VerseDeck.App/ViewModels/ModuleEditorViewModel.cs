@@ -56,6 +56,12 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _confidence = "0.40";
 
+    [ObservableProperty]
+    private string _selectedResponseMode = ResponseFromPack;
+
+    [ObservableProperty]
+    private string _responseText = string.Empty;
+
     public ModuleEditorViewModel(DeckSession session, IDialogService dialogs, IStatusSink status, ControlSync controls, GameActionCatalog catalog)
     {
         _controls = controls;
@@ -68,6 +74,11 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     public IReadOnlyList<string> Categories => ModuleStyle.Categories;
     public IReadOnlyList<string> Icons => ModuleStyle.Icons;
     public IReadOnlyList<string> Frames => ModuleStyle.Frames;
+    public const string ResponseFromPack = "De la personalidad";
+    public const string ResponseCustom = "Texto propio";
+    public const string ResponseNone = "Ninguna";
+
+    public IReadOnlyList<string> ResponseModes { get; } = [ResponseFromPack, ResponseCustom, ResponseNone];
     public ObservableCollection<string> Phrases { get; } = [];
     public ObservableCollection<GameActionChoice> GameActionChoices { get; } = [];
 
@@ -99,6 +110,9 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
         Key = button.Action.Key;
         Modifiers = string.Join(", ", button.Action.Modifiers);
         RequiresConfirmation = button.RequiresConfirmation;
+        var response = (button.Response ?? string.Empty).Trim();
+        SelectedResponseMode = response.Length == 0 ? ResponseFromPack : response == Speech.ResponseSelector.Silent ? ResponseNone : ResponseCustom;
+        ResponseText = SelectedResponseMode == ResponseCustom ? response : string.Empty;
         NewPhrase = button.Name.ToLowerInvariant();
         Confidence = _session.Settings.VoiceMinimumConfidence.ToString("0.00", CultureInfo.CurrentCulture);
         foreach (var command in _session.VoiceCommands.Where(v => v.ButtonId == button.Id).OrderBy(v => v.Phrase))
@@ -123,6 +137,11 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
+        if (!TryReadResponse(out var response))
+        {
+            return;
+        }
+
         // A long hold belongs to the game action that needs it, not to the module that was linked to it.
         var selectedId = SelectedGameAction?.Id ?? string.Empty;
         if (IsLinked && !selectedId.Equals(_button.GameAction, StringComparison.OrdinalIgnoreCase))
@@ -140,7 +159,8 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
                 AccentColor = ModuleStyle.AccentForFrame(OrDefault(Frame, ModuleStyle.FrameFor(_button))),
                 Action = action,
                 RequiresConfirmation = RequiresConfirmation,
-                GameAction = SelectedGameAction?.Id ?? string.Empty
+                GameAction = SelectedGameAction?.Id ?? string.Empty,
+                Response = response
             });
             await _controls.Pending;
             _status.Info("Modulo guardado");
@@ -245,6 +265,27 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
         }
 
         SelectedGameAction = GameActionChoices.FirstOrDefault(c => c.Id.Equals(current, StringComparison.OrdinalIgnoreCase)) ?? GameActionChoices[0];
+    }
+
+    // What the copilot says for this module: empty for the personality's phrase, "-" for silence, or the player's own text.
+    private bool TryReadResponse(out string response)
+    {
+        response = string.Empty;
+        if (SelectedResponseMode == ResponseNone)
+        {
+            response = Speech.ResponseSelector.Silent;
+        }
+        else if (SelectedResponseMode == ResponseCustom)
+        {
+            response = ResponseText.Trim();
+            if (response.Length == 0 || response == Speech.ResponseSelector.Silent)
+            {
+                _status.Error("Escribe lo que debe decir el copiloto, o elige otra opcion de respuesta.");
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool TryReadName(out string name)

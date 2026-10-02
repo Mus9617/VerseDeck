@@ -4,6 +4,7 @@ using VerseDeck.App.ViewModels;
 using VerseDeck.Core.Models;
 using VerseDeck.Data;
 using VerseDeck.Game;
+using VerseDeck.Speech;
 
 namespace VerseDeck.Tests;
 
@@ -177,6 +178,14 @@ public sealed class Harness : IAsyncDisposable
     public List<ThemeId> AppliedThemes { get; } = [];
     public int DebugConsoleOpens { get; private set; }
     public int InputDrains { get; private set; }
+    public FakeTtsEngine Tts { get; } = new();
+    public FakeAudioPlayer Player { get; } = new();
+    public SpeechGuard Guard { get; } = new();
+    public string SpeechRoot { get; } = SpeechFixture.TempFolder("speech");
+    public VoiceStore VoiceStore { get; private set; } = null!;
+    public PhraseCache PhraseCache { get; private set; } = null!;
+    public FakeVoiceInstaller VoiceInstaller { get; private set; } = null!;
+    public CopilotService Copilot { get; private set; } = null!;
     public FakeGameFolder? Game { get; private set; }
     public FakeFileWatch Watch { get; } = new();
     public ControlSync ControlSync { get; private set; } = null!;
@@ -185,9 +194,24 @@ public sealed class Harness : IAsyncDisposable
     public DeckSession Session { get; private set; } = null!;
     public ShellViewModel Shell { get; private set; } = null!;
 
-    public static async Task<Harness> CreateAsync(bool initialize = true, bool withGame = true)
+    /// <summary>Switches the copilot on with the default voice, as a player who has set it up.</summary>
+    public async Task EnableCopilotAsync()
+    {
+        await Session.SaveSettingsAsync(Session.Settings with { CopilotEnabled = true, CopilotVoice = VoiceCatalog.DefaultVoiceId });
+        await Copilot.Pending;
+    }
+
+    public static async Task<Harness> CreateAsync(bool initialize = true, bool withGame = true, bool withVoice = true)
     {
         var harness = new Harness();
+        harness.VoiceStore = new VoiceStore(Path.Combine(harness.SpeechRoot, "voices"));
+        harness.PhraseCache = new PhraseCache(Path.Combine(harness.SpeechRoot, "cache"));
+        harness.VoiceInstaller = new FakeVoiceInstaller(harness.VoiceStore);
+        if (withVoice)
+        {
+            FakeVoiceInstaller.Put(harness.VoiceStore, SpeechFixture.Voice);
+        }
+
         var launcherLogs = Path.Combine(Path.GetTempPath(), $"versedeck-launcher-{Guid.NewGuid():N}");
         if (withGame)
         {
@@ -205,6 +229,7 @@ public sealed class Harness : IAsyncDisposable
         var catalog = GameActionCatalog.Load();
         harness.ControlSync = new ControlSync(harness.Session, new GameInstallLocator(launcherLogs, []), catalog, harness.Watch, harness.Ui, harness.Log, () => harness.Now);
         var executor = new ButtonExecutor(harness.Sender, harness.Repository, harness.Dialogs, harness.Audio, harness.Log, () => harness.Session.Settings);
+        harness.Copilot = new CopilotService(harness.Session, executor, harness.Tts, harness.PhraseCache, harness.Player, VoiceCatalog.Load(), harness.VoiceStore, ResponsePack.LoadAll(), harness.Guard, harness.Log, () => harness.Now);
         harness.Shell = new ShellViewModel(new ShellServices(
             harness.Session,
             harness.Repository,
@@ -220,6 +245,9 @@ public sealed class Harness : IAsyncDisposable
             () => harness.DebugConsoleOpens++,
             harness.ControlSync,
             catalog,
+            harness.Copilot,
+            harness.Guard,
+            harness.VoiceInstaller,
             () => harness.Now,
             () =>
             {
@@ -241,6 +269,11 @@ public sealed class Harness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Game?.Dispose();
+        if (Directory.Exists(SpeechRoot))
+        {
+            Directory.Delete(SpeechRoot, recursive: true);
+        }
+
         if (Directory.Exists(LauncherLogs))
         {
             Directory.Delete(LauncherLogs, recursive: true);

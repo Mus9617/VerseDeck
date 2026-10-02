@@ -72,7 +72,7 @@ public sealed partial class DeckViewModel : ObservableObject
         _status = status;
         _ui = ui;
         _session.Changed += (_, _) => Rebuild();
-        _executor.Sent += (_, button) => Flash(button.Id);
+        _executor.Sent += (_, e) => Flash(e.Button.Id);
     }
 
     public ObservableCollection<ModuleGroup> Groups { get; } = [];

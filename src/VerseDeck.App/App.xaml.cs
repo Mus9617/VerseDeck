@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
 using VerseDeck.App.Services;
@@ -7,6 +8,7 @@ using VerseDeck.App.ViewModels;
 using VerseDeck.Data;
 using VerseDeck.Game;
 using VerseDeck.Input;
+using VerseDeck.Speech;
 using VerseDeck.Voice;
 
 namespace VerseDeck.App;
@@ -47,6 +49,21 @@ public partial class App : Application
         var controlSync = new ControlSync(session, GameInstallLocator.ForThisMachine(), catalog, new FileWatch(), ui, log, () => DateTimeOffset.Now);
         var executor = new ButtonExecutor(inputSender, repository, dialogs, audio, log, () => session.Settings);
 
+        var voiceStore = new VoiceStore(Path.Combine(AppDataPath, "voices"));
+        var speechGuard = new SpeechGuard();
+        var copilot = new CopilotService(
+            session,
+            executor,
+            new SherpaTtsEngine(voiceStore),
+            new PhraseCache(Path.Combine(AppDataPath, "voice-cache")),
+            new WavAudioPlayer(),
+            VoiceCatalog.Load(),
+            voiceStore,
+            ResponsePack.LoadAll(),
+            speechGuard,
+            log,
+            () => DateTimeOffset.Now);
+
         return new ShellViewModel(new ShellServices(
             session,
             repository,
@@ -62,6 +79,9 @@ public partial class App : Application
             () => OpenDebugConsole(log),
             controlSync,
             catalog,
+            copilot,
+            speechGuard,
+            new VoiceInstaller(new HttpClient { Timeout = TimeSpan.FromMinutes(30) }, voiceStore),
             DrainInput: inputSender.WhenIdleAsync));
     }
 

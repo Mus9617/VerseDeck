@@ -24,6 +24,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     private readonly IStatusSink _status;
     private readonly IUiScheduler _ui;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly SpeechGuard _guard;
+    private string _engineSignature = string.Empty;
     private DateTimeOffset _lastRecognition = DateTimeOffset.MinValue;
     private IDisposable? _graceTimer;
     private bool _busy;
@@ -50,9 +52,10 @@ public sealed partial class VoiceViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetecting;
 
-    public VoiceViewModel(DeckSession session, IVoiceCommandService voice, IPttMonitor ptt, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, IDebugLog log, Func<DateTimeOffset> clock)
+    public VoiceViewModel(DeckSession session, IVoiceCommandService voice, IPttMonitor ptt, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, IDebugLog log, Func<DateTimeOffset> clock, SpeechGuard guard)
     {
         _clock = clock;
+        _guard = guard;
         _session = session;
         _voice = voice;
         _ptt = ptt;
@@ -195,6 +198,7 @@ public sealed partial class VoiceViewModel : ObservableObject
     {
         // A pause scheduled by the previous engine must not land on the new one.
         _graceTimer?.Dispose();
+        _engineSignature = EngineSignature();
         var settings = _session.Settings;
         var commands = _session.VoiceCommands
             .Select(c => c with { MinimumConfidence = Math.Min(c.MinimumConfidence, settings.VoiceMinimumConfidence) })
@@ -244,7 +248,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     private void OnSessionChanged()
     {
         // The engine holds a snapshot of phrases and buttons, so any deck change needs a reload.
-        if (_busy || State == LinkState.Offline)
+        // Unrelated changes (a volume slider, a theme) must not reload the recogniser.
+        if (_busy || State == LinkState.Offline || EngineSignature() == _engineSignature)
         {
             return;
         }
@@ -308,6 +313,12 @@ public sealed partial class VoiceViewModel : ObservableObject
             return;
         }
 
+        // In always-listening mode the microphone hears the copilot's own voice.
+        if (_session.Settings.VoiceActivationMode != PushToTalk && _guard.Blocks(now))
+        {
+            return;
+        }
+
         _lastRecognition = now;
         RequestSelect?.Invoke(button.Id);
         var result = await _executor.ExecuteAsync(button, "Voice");
@@ -320,6 +331,15 @@ public sealed partial class VoiceViewModel : ObservableObject
         {
             _status.Error($"No se pudo enviar {button.Name}: {_executor.LastError}");
         }
+    }
+
+    // Everything the running engine depends on: what it listens for and how it is activated.
+    private string EngineSignature()
+    {
+        var settings = _session.Settings;
+        var phrases = string.Join("|", _session.VoiceCommands.Select(c => $"{c.ButtonId}:{c.Phrase}:{c.MinimumConfidence}:{c.Enabled}"));
+        var buttons = string.Join("|", _session.Buttons.Select(b => $"{b.Id}:{b.Name}"));
+        return $"{settings.VoiceActivationMode};{settings.PushToTalkDevice};{settings.PushToTalkBinding};{settings.VoiceMinimumConfidence};{phrases};{buttons}";
     }
 
     private string ArmedText() => $"PTT armado: manten {_session.Settings.PushToTalkDevice}:{_session.Settings.PushToTalkBinding}";

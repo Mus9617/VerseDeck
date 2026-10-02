@@ -4,6 +4,8 @@ namespace VerseDeck.App.Services;
 
 public enum ExecuteResult { Sent, Cancelled, Failed }
 
+public sealed record ExecutedEventArgs(DeckButton Button, string Source);
+
 /// <summary>Turns one human trigger into at most one key press.</summary>
 public sealed class ButtonExecutor
 {
@@ -24,11 +26,34 @@ public sealed class ButtonExecutor
         _settings = settings;
     }
 
-    public event EventHandler<DeckButton>? Sent;
+    /// <summary>The press went out.</summary>
+    public event EventHandler<ExecutedEventArgs>? Sent;
+
+    /// <summary>The press was attempted and Windows or validation rejected it.</summary>
+    public event EventHandler<ExecutedEventArgs>? Failed;
+
+    /// <summary>Nothing was sent because <see cref="BlockReason"/> gave a reason.</summary>
+    public event EventHandler<ExecutedEventArgs>? Blocked;
+
     public string? LastError { get; private set; }
+
+    /// <summary>Returns why a module must not be sent right now, or null to let it through.</summary>
+    public Func<DeckButton, string?>? BlockReason { get; set; }
+
+    /// <summary>True when something else will acknowledge this press out loud, so the command beep stays quiet.</summary>
+    public Func<DeckButton, string, bool>? WillBeAnswered { get; set; }
 
     public async Task<ExecuteResult> ExecuteAsync(DeckButton button, string source)
     {
+        var args = new ExecutedEventArgs(button, source);
+        if (BlockReason?.Invoke(button) is { } reason)
+        {
+            LastError = reason;
+            _log.Write($"{source} blocked {button.Name}: {reason}");
+            Blocked?.Invoke(this, args);
+            return ExecuteResult.Failed;
+        }
+
         if (button.RequiresConfirmation && !_dialogs.Confirm("Confirmar accion", $"Ejecutar {button.Name}?"))
         {
             return ExecuteResult.Cancelled;
@@ -45,16 +70,17 @@ public sealed class ButtonExecutor
         {
             LastError = ex.Message;
             _log.Write($"{source} failed {button.Name}: {ex}");
+            Failed?.Invoke(this, args);
             return ExecuteResult.Failed;
         }
 
         LastError = null;
-        if (_settings().CommandSoundEnabled)
+        if (_settings().CommandSoundEnabled && WillBeAnswered?.Invoke(button, source) != true)
         {
             _audio.PlayCommand();
         }
 
-        Sent?.Invoke(this, button);
+        Sent?.Invoke(this, args);
         return ExecuteResult.Sent;
     }
 }

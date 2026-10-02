@@ -29,7 +29,7 @@ public sealed class ButtonExecutorTests : IAsyncLifetime
     public async Task Execute_SendsOnePress_LogsAndPlaysSound()
     {
         DeckButton? raised = null;
-        _executor.Sent += (_, button) => raised = button;
+        _executor.Sent += (_, e) => raised = e.Button;
 
         var result = await _executor.ExecuteAsync(Button("Lights"), "Windows");
 

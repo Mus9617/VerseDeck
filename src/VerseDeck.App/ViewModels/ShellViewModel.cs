@@ -4,6 +4,7 @@ using QRCoder;
 using VerseDeck.App.Services;
 using VerseDeck.Core.Models;
 using VerseDeck.Game;
+using VerseDeck.Speech;
 
 namespace VerseDeck.App.ViewModels;
 
@@ -178,6 +179,9 @@ public sealed record ShellServices(
     Action OpenDebugConsole,
     ControlSync ControlSync,
     GameActionCatalog Catalog,
+    CopilotService Copilot,
+    SpeechGuard SpeechGuard,
+    IVoiceInstaller VoiceInstaller,
     Func<DateTimeOffset>? Clock = null,
     Func<Task>? DrainInput = null);
 
@@ -203,6 +207,9 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     [ObservableProperty]
     private string _shipTitle = string.Empty;
 
+    [ObservableProperty]
+    private bool _isMuted;
+
     public ShellViewModel(ShellServices services)
     {
         _services = services;
@@ -211,7 +218,14 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Controls = new ControlsViewModel(services.Session, services.ControlSync, services.Catalog, this);
         Profile = new ProfileViewModel(services.Session, this);
         Activity = new ActivityViewModel(services.Repository);
-        Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now));
+        Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now), services.SpeechGuard);
+        Copilot = new CopilotViewModel(services.Session, services.Copilot, services.VoiceInstaller, this);
+
+        // A linked module whose game action has no usable key must not fire the key it had before.
+        services.Executor.BlockReason = button => services.ControlSync.StatusOf(button.Id) is BindStatus.NoKey or BindStatus.NotSendable
+            ? "Esa accion no tiene tecla utilizable en el juego. Revisa la seccion Controles."
+            : null;
+        services.Copilot.Changed += (_, _) => IsMuted = services.Copilot.Muted;
         Mobile = new MobileLinkViewModel(services.Session, services.Mobile, this);
         Settings = new SettingsViewModel(services.Session, services.Themes, this, services.OpenDebugConsole);
 
@@ -230,6 +244,10 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public MobileLinkViewModel Mobile { get; }
     public SettingsViewModel Settings { get; }
     public ControlsViewModel Controls { get; }
+    public CopilotViewModel Copilot { get; }
+
+    /// <summary>The copilot's greeting and phrase warm-up, started at launch and never awaited by the interface.</summary>
+    public Task CopilotStart { get; private set; } = Task.CompletedTask;
 
     public async Task InitializeAsync()
     {
@@ -245,6 +263,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 
             await Activity.RefreshAsync();
             ScheduleRefresh();
+            CopilotStart = _services.Copilot.StartAsync();
             _services.Log.Write("App initialized");
             Info("Sistema listo");
         }
@@ -272,6 +291,8 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 
     [RelayCommand]
     private void Navigate(string section) => Section = section;
+
+    partial void OnIsMutedChanged(bool value) => _services.Copilot.Muted = value;
 
     public void Info(string message)
     {
