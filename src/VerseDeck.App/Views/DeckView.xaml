@@ -41,6 +41,8 @@
                                         <TextBlock DockPanel.Dock="Right" Text="CONFIRMA" FontFamily="{DynamicResource HeadingFont}" FontSize="11" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Warning}" VerticalAlignment="Center" Margin="8,0,0,0"
                                                    Visibility="{Binding RequiresConfirmation, Converter={StaticResource BoolToVisibility}}"/>
+                                        <TextBlock x:Name="WarningText" DockPanel.Dock="Right" Text="{Binding Warning}" FontFamily="{DynamicResource HeadingFont}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Warning}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                         <TextBlock Text="{Binding VoiceSummary}" FontSize="11" Foreground="{DynamicResource TextMuted}"
                                                    VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
                                     </DockPanel>
@@ -48,6 +50,9 @@
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Warning}" Value="">
+                                <Setter TargetName="WarningText" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding AccentKey}" Value="Danger">
                                 <Setter TargetName="Stripe" Property="Background" Value="{DynamicResource Danger}"/>
                                 <Setter TargetName="Flash" Property="Background" Value="{DynamicResource Danger}"/>

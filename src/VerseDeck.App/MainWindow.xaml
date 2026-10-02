@@ -88,6 +88,8 @@
                 <StackPanel Margin="0,12,0,0">
                     <RadioButton Style="{StaticResource NavButton}" Content="DECK" Tag="{StaticResource Icon.nav.deck}"
                                  IsChecked="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Deck}"/>
+                    <RadioButton Style="{StaticResource NavButton}" Content="CONTROLES" Tag="{StaticResource Icon.nav.controls}"
+                                 IsChecked="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Controles}"/>
                     <RadioButton Style="{StaticResource NavButton}" Content="VOZ" Tag="{StaticResource Icon.nav.voice}"
                                  IsChecked="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Voz}"/>
                     <RadioButton Style="{StaticResource NavButton}" Content="MOVIL" Tag="{StaticResource Icon.nav.mobile}"
@@ -98,6 +100,7 @@
             </Border>
             <Grid Grid.Column="1">
                 <views:DeckView Visibility="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Deck}"/>
+                <views:ControlsView Visibility="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Controles}"/>
                 <views:VoiceView Visibility="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Voz}"/>
                 <views:MobileView Visibility="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Movil}"/>
                 <views:SettingsView Visibility="{Binding Section, Converter={StaticResource SectionEquals}, ConverterParameter=Ajustes}"/>

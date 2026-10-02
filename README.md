@@ -29,6 +29,16 @@ dotnet run --project src/VerseDeck.App/VerseDeck.App.csproj
 
 El tema cambia solo segun el fabricante de la nave del perfil activo: **Drake**, **Origin**, **Aegis** y **Anvil**. Cualquier otra nave usa **Neutral**. En Ajustes se puede fijar un tema concreto.
 
+## Controles
+
+VerseDeck lee `actionmaps.xml` de tu perfil de Star Citizen y usa tu tecla en los modulos vinculados a una accion del juego. Si cambias un bind en el juego, el modulo se actualiza solo.
+
+- Solo lectura: nunca escribe en la carpeta del juego ni abre `Data.p4k`.
+- El juego solo guarda lo que has cambiado. Para lo demas se usa un catalogo propio de teclas por defecto, valido para la version **4.10**; tras un parche puede dejar de coincidir.
+- Los nombres internos de las acciones del catalogo vienen de documentacion comunitaria y no estan verificados contra el juego. Si un modulo vinculado ignora tu rebind, vinculalo a la accion tal como aparece en "Tus rebinds".
+- Las acciones que piden mantener la tecla (autodestruccion, modo maestro, aterrizaje automatico) se envian como una sola pulsacion larga, de 2 segundos como maximo.
+- No se envian botones de raton, mando o joystick ni dobles pulsaciones.
+
 ## Panel movil
 
 El servidor solo responde dentro de la red local. El telefono se empareja escribiendo el PIN que muestra la app; sin emparejar no puede listar ni pulsar modulos.

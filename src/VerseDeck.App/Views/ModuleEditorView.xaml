@@ -28,7 +28,11 @@
                 </StackPanel>
             </Grid>
 
-            <Grid>
+            <TextBlock Text="ACCION DEL JUEGO" Style="{StaticResource FieldLabel}"/>
+            <ComboBox ItemsSource="{Binding Editor.GameActionChoices}" SelectedItem="{Binding Editor.SelectedGameAction}" DisplayMemberPath="Label"
+                      ToolTip="Con una accion elegida, la tecla se lee de tus controles de Star Citizen"/>
+
+            <Grid IsEnabled="{Binding Editor.IsManual}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="12"/>
@@ -43,6 +47,9 @@
                     <TextBox Text="{Binding Editor.Modifiers, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" ToolTip="Ctrl, Shift, Alt separados por comas"/>
                 </StackPanel>
             </Grid>
+
+            <TextBlock Text="Tecla tomada del juego. Cambiala en Star Citizen o elige (ninguna) para escribirla a mano." Style="{StaticResource Muted}" Margin="0,6,0,0"
+                       Visibility="{Binding Editor.IsLinked, Converter={StaticResource BoolToVisibility}}"/>
 
             <CheckBox Content="Pedir confirmacion antes de enviar" IsChecked="{Binding Editor.RequiresConfirmation}" Margin="0,12,0,8"/>
 

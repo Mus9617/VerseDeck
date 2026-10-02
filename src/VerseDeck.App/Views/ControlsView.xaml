@@ -1,0 +1,154 @@
+<UserControl x:Class="VerseDeck.App.Views.ControlsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style x:Key="Cell" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+        <Style x:Key="MonoCell" TargetType="TextBlock" BasedOn="{StaticResource Cell}">
+            <Setter Property="FontFamily" Value="{DynamicResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24" MaxWidth="980" HorizontalAlignment="Left">
+            <TextBlock Text="CONTROLES" Style="{StaticResource H1}"/>
+            <TextBlock Text="VerseDeck lee tus teclas de Star Citizen y las usa en los modulos vinculados. Solo lee: nunca escribe en la carpeta del juego." Style="{StaticResource Muted}"/>
+
+            <!-- Game folder -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="JUEGO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Text="{Binding Controls.GameFolderText}" FontFamily="{DynamicResource MonoFont}" FontSize="14" Foreground="{DynamicResource Accent}" Margin="0,6,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Controls.FileStatus}" Style="{StaticResource Body}"/>
+                    <TextBlock Text="{Binding Controls.CatalogVersion}" Style="{StaticResource Muted}" Margin="0,2,0,0"/>
+                    <TextBlock Text="CARPETA LIVE (VACIO = DETECCION AUTOMATICA)" Style="{StaticResource FieldLabel}" Margin="0,14,0,4"/>
+                    <TextBox Text="{Binding Controls.FolderInput, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" Width="560" HorizontalAlignment="Left"/>
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Content="SINCRONIZAR" Style="{StaticResource PrimaryButton}" Command="{Binding Controls.SyncCommand}"/>
+                        <Button Content="GUARDAR CARPETA" Command="{Binding Controls.SaveFolderCommand}"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Linked modules -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="MODULOS VINCULADOS" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="Un modulo vinculado toma su tecla del juego. Para vincular uno: DECK, activar EDITAR, elegir el modulo y su accion del juego."/>
+                    <ItemsControl ItemsSource="{Binding Controls.Links}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,7">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="230"/>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Module}" Style="{StaticResource Cell}" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Action}" Style="{StaticResource Cell}"/>
+                                        <Border Grid.Column="2" Style="{StaticResource KeyCap}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding KeyText}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource Text}"/>
+                                        </Border>
+                                        <TextBlock x:Name="Status" Grid.Column="3" Text="{Binding StatusText}" Style="{StaticResource Cell}" FontWeight="SemiBold" Foreground="{DynamicResource Positive}"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Detail}" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding StatusKey}" Value="Warning">
+                                        <Setter TargetName="Status" Property="Foreground" Value="{DynamicResource Warning}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding StatusKey}" Value="Danger">
+                                        <Setter TargetName="Status" Property="Foreground" Value="{DynamicResource Danger}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Link the default modules -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="{Binding Controls.HasPresetPreview, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="VINCULAR MODULOS POR DEFECTO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="Estos modulos corresponden a una accion del juego. Al vincularlos, su tecla pasa a ser la que se muestra a la derecha. Nada cambia hasta que pulses el boton."/>
+                    <ItemsControl ItemsSource="{Binding Controls.PresetPreview}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="260"/>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="30"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Module}" Style="{StaticResource Cell}" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Action}" Style="{StaticResource Cell}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding CurrentKey}" Style="{StaticResource MonoCell}" Foreground="{DynamicResource TextMuted}"/>
+                                        <Path Grid.Column="3" Data="M0 5 H12 M8 1 L12 5 L8 9" Stroke="{DynamicResource TextMuted}" StrokeThickness="1.5" Width="14" Height="10" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding NewKey}" Style="{StaticResource MonoCell}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="VINCULAR ESTOS MODULOS" Style="{StaticResource PrimaryButton}" Command="{Binding Controls.LinkPresetsCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- The player's rebinds, as written in the file -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="TUS REBINDS" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="Lo que hay en tu actionmaps.xml. El juego solo guarda lo que has cambiado. Las acciones marcadas como fuera del catalogo se pueden vincular igualmente desde el editor de modulo."/>
+                    <ItemsControl ItemsSource="{Binding Controls.Rebinds}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="250"/>
+                                            <ColumnDefinition Width="280"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding ActionMap}" Style="{StaticResource MonoCell}" Foreground="{DynamicResource TextMuted}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Action}" Style="{StaticResource MonoCell}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Input}" Style="{StaticResource MonoCell}" Foreground="{DynamicResource Accent}"/>
+                                        <TextBlock x:Name="Outside" Grid.Column="3" Text="fuera del catalogo" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding InCatalog}" Value="True">
+                                        <Setter TargetName="Outside" Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="LIMITES" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0"
+                               Text="Las teclas por defecto vienen de un catalogo propio para la version indicada arriba; tras un parche pueden dejar de coincidir. Si un modulo no hace lo esperado, asigna la accion a una tecla en el juego: VerseDeck usara la tuya. Las acciones que piden mantener la tecla se envian como una sola pulsacion larga."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
