@@ -1,0 +1,119 @@
+<UserControl x:Class="VerseDeck.App.Views.CopilotView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24" MaxWidth="980" HorizontalAlignment="Left">
+            <TextBlock Text="COPILOTO" Style="{StaticResource H1}"/>
+            <TextBlock Text="Una voz local que confirma tus ordenes. Se genera en tu PC: no usa servicios en linea ni toca el juego." Style="{StaticResource Muted}"/>
+
+            <!-- When it speaks -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="CUANDO HABLA" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Text="{Binding Copilot.StatusLine}" Style="{StaticResource H2}" Margin="0,6,0,8"/>
+                    <CheckBox Content="Copiloto activado" IsChecked="{Binding Copilot.Enabled}"/>
+                    <CheckBox Content="Contestar solo a los comandos de voz (callar con clics y toques)" IsChecked="{Binding Copilot.VoiceOnly}"/>
+                    <CheckBox Content="Saludar al arrancar" IsChecked="{Binding Copilot.Greeting}"/>
+                    <TextBlock Text="CATEGORIAS QUE CONTESTAN" Style="{StaticResource FieldLabel}" Margin="0,12,0,2"/>
+                    <ItemsControl ItemsSource="{Binding Copilot.Categories}" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}" IsChecked="{Binding Speaks}" Margin="0,4,24,4" MinWidth="110"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="Para callar un modulo concreto o escribirle su propia frase: DECK, activar EDITAR, elegir el modulo y su respuesta. El interruptor SILENCIO de la cabecera calla todo al instante."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Voice -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="VOZ" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="Las voces no vienen con la aplicacion. Al pulsar DESCARGAR se bajan una vez desde la publicacion de sherpa-onnx en GitHub y se quedan en tu PC."/>
+                    <ItemsControl ItemsSource="{Binding Copilot.Voices}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Details}" Style="{StaticResource Muted}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ProgressBar x:Name="Bar" Width="160" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Margin="0,0,12,0" Visibility="Collapsed"/>
+                                            <Button x:Name="Cancel" Content="CANCELAR" Command="{Binding CancelCommand}" Margin="0" Visibility="Collapsed"/>
+                                            <Button x:Name="Install" Content="DESCARGAR" Command="{Binding InstallCommand}" Margin="0"/>
+                                            <Button x:Name="Use" Content="USAR" Command="{Binding UseCommand}" Margin="0" Visibility="Collapsed"/>
+                                            <TextBlock x:Name="InUse" Text="EN USO" FontFamily="{DynamicResource HeadingFont}" FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Positive}" VerticalAlignment="Center" Margin="14,0" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                                        <Setter TargetName="Install" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="Use" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="Use" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="InUse" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                        <Setter TargetName="Install" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="Use" Property="Visibility" Value="Collapsed"/>
+                                        <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="Cancel" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Style="{StaticResource Divider}" Margin="0,4,0,12"/>
+                    <TextBlock Text="VOLUMEN" Style="{StaticResource FieldLabel}" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Slider Width="260" Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1" VerticalAlignment="Center"
+                                Value="{Binding Copilot.Volume, Delay=400}"/>
+                        <Button Content="PROBAR VOZ" Command="{Binding Copilot.TestCommand}" Margin="16,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Personality -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="PERSONALIDAD" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,8,0,0" ItemsSource="{Binding Copilot.Packs}" SelectedItem="{Binding Copilot.SelectedPack}" DisplayMemberPath="Name"/>
+                    <TextBlock Text="{Binding Copilot.PackSample}" Style="{StaticResource Body}" FontStyle="Italic" Margin="0,10,0,0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="La personalidad cambia las palabras, no la voz. Las frases confirman la orden; VerseDeck no sabe en que estado queda la nave."/>
+                </StackPanel>
+            </Border>
+
+            <!-- Cache -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="FRASES PREPARADAS" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Text="{Binding Copilot.CacheText}" Style="{StaticResource Body}" Margin="0,6,0,0"/>
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Content="GENERAR AHORA" Command="{Binding Copilot.WarmUpCommand}"/>
+                        <Button Content="VACIAR" Command="{Binding Copilot.ClearCacheCommand}"/>
+                    </WrapPanel>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="Cada frase se genera una vez y luego suena al instante. Una frase que aun no este preparada se genera en el momento, con un pequeno retraso la primera vez."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

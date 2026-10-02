@@ -39,6 +39,17 @@ VerseDeck lee `actionmaps.xml` de tu perfil de Star Citizen y usa tu tecla en lo
 - Las acciones que piden mantener la tecla (autodestruccion, modo maestro, aterrizaje automatico) se envian como una sola pulsacion larga, de 2 segundos como maximo.
 - No se envian botones de raton, mando o joystick ni dobles pulsaciones.
 
+## Copiloto
+
+Una voz neuronal que confirma tus ordenes. Se genera en tu PC con [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx); no usa servicios en linea ni de pago.
+
+- Las voces no vienen con la aplicacion. En la seccion Copiloto, DESCARGAR baja el modelo elegido desde la publicacion de sherpa-onnx en GitHub, comprueba su SHA-256 y lo guarda en `%AppData%\VerseDeck Companion\voices`. Es la unica conexion a internet de esta funcion.
+- Voces en español: Piper davefx (datos CC0), Piper sharvard (datos CC BY 3.0, Universidad de Edimburgo), Piper claude (Apache 2.0) y Kokoro (Apache 2.0).
+- Cada frase se genera una vez y se guarda; despues suena al instante.
+- Interruptores: general, SILENCIO en la cabecera, solo comandos de voz, por categoria y por modulo (frase de la personalidad, texto propio o ninguna).
+- Las frases confirman la orden, no el estado de la nave: VerseDeck sabe que envio la tecla, nada mas.
+- Un modulo vinculado a una accion sin tecla en el juego ya no envia la tecla que tenia antes: avisa y no envia nada.
+
 ## Panel movil
 
 El servidor solo responde dentro de la red local. El telefono se empareja escribiendo el PIN que muestra la app; sin emparejar no puede listar ni pulsar modulos.

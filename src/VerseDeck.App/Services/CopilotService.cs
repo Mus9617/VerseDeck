@@ -250,6 +250,7 @@ public sealed class CopilotService
         try
         {
             var phrase = _cache.TryGet(voice, text);
+            var source = phrase is null ? "generated" : "cache";
             if (phrase is null)
             {
                 var audio = await _engine.SynthesizeAsync(voice, text, CancellationToken.None);
@@ -262,6 +263,7 @@ public sealed class CopilotService
             }
 
             _player.Play(phrase.Path, _session.Settings.CopilotVolume);
+            _log.Write($"Copilot said '{text}' ({source})");
             _guard.BlockUntil(_clock() + phrase.Duration + EchoMargin);
         }
         catch (Exception ex)

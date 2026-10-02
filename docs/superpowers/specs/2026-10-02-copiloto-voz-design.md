@@ -1,7 +1,10 @@
 # Sub-proyecto 3a — Voz del copiloto
 
 Fecha: 2026-10-02
-Estado: pendiente de revisión
+Estado: implementado en la rama `copiloto-voz`. Diferencias con lo escrito aquí:
+la reproducción usa `System.Media.SoundPlayer` en lugar de NAudio (que no
+admite este destino de compilación), y un módulo vinculado sin tecla
+utilizable ya no envía su tecla anterior.
 
 El sub-proyecto 3 de la hoja de ruta se parte en tres, cada uno con su spec:
 
