@@ -9,23 +9,50 @@ public sealed class WindowsInputSender : IInputSender
     private const uint KeyEventKeyUp = 0x0002;
     private const uint KeyEventScanCode = 0x0008;
 
+    private readonly Action<IReadOnlyList<KeyStroke>> _send;
+    private readonly Func<ushort, ushort> _scanCodeOf;
+
+    // Presses from the deck, voice and phone must not overlap: a held Alt would change the next key.
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    public WindowsInputSender()
+        : this(Send, ScanCodeOf)
+    {
+    }
+
+    /// <summary>For tests: replaces the Win32 calls so the press sequence can be observed.</summary>
+    public WindowsInputSender(Action<IReadOnlyList<KeyStroke>> send, Func<ushort, ushort> scanCodeOf)
+    {
+        _send = send;
+        _scanCodeOf = scanCodeOf;
+    }
+
     public async Task SendAsync(KeyPressAction action, CancellationToken cancellationToken = default)
     {
         action.Validate();
         cancellationToken.ThrowIfCancellationRequested();
 
         // One press: keys go down, are held for the configured duration, then released.
-        var down = KeyInputBuilder.Down(action, ScanCodeOf);
-        var up = KeyInputBuilder.Up(action, ScanCodeOf);
+        var down = KeyInputBuilder.Down(action, _scanCodeOf);
+        var up = KeyInputBuilder.Up(action, _scanCodeOf);
 
-        Send(down);
+        await _gate.WaitAsync(cancellationToken);
         try
         {
-            await Task.Delay(Math.Min(action.PressDurationMs, KeyPressAction.MaxPressDurationMs), cancellationToken);
+            try
+            {
+                _send(down);
+                await Task.Delay(Math.Min(action.PressDurationMs, KeyPressAction.MaxPressDurationMs), cancellationToken);
+            }
+            finally
+            {
+                // Runs even if only part of the down batch was accepted, so no key stays held.
+                _send(up);
+            }
         }
         finally
         {
-            Send(up);
+            _gate.Release();
         }
     }
 

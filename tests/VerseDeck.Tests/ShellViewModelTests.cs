@@ -180,6 +180,96 @@ public class VoiceViewModelTests
     }
 
     [Fact]
+    public async Task SecondRecognition_OfTheSamePhrase_WithinDebounce_IsIgnored()
+    {
+        await using var h = await WithModeAsync("ManualToggle");
+        await h.Shell.Voice.StartCommand.ExecuteAsync(null);
+        var lights = h.Session.Buttons.First(b => b.Name == "Lights");
+        var command = h.Session.VoiceCommands.First(v => v.ButtonId == lights.Id);
+
+        // Two installed recognizers each report the same utterance.
+        h.Voice.Raise(command, lights);
+        await h.Shell.Voice.Pending;
+        h.Now += TimeSpan.FromMilliseconds(200);
+        h.Voice.Raise(command, lights);
+        await h.Shell.Voice.Pending;
+
+        Assert.Single(h.Sender.Sent);
+
+        h.Now += TimeSpan.FromSeconds(1);
+        h.Voice.Raise(command, lights);
+        await h.Shell.Voice.Pending;
+
+        Assert.Equal(2, h.Sender.Sent.Count);
+    }
+
+    [Fact]
+    public async Task Recognized_WhileOffline_SendsNothing()
+    {
+        await using var h = await WithModeAsync("ManualToggle");
+        await h.Shell.Voice.StartCommand.ExecuteAsync(null);
+        var lights = h.Session.Buttons.First(b => b.Name == "Lights");
+        var command = h.Session.VoiceCommands.First(v => v.ButtonId == lights.Id);
+        await h.Shell.Voice.StopCommand.ExecuteAsync(null);
+
+        h.Voice.Raise(command, lights);
+        await h.Shell.Voice.Pending;
+
+        Assert.Empty(h.Sender.Sent);
+    }
+
+    [Fact]
+    public async Task Recognized_ForDeletedModule_SendsNothing()
+    {
+        await using var h = await WithModeAsync("ManualToggle");
+        await h.Shell.Voice.StartCommand.ExecuteAsync(null);
+        var lights = h.Session.Buttons.First(b => b.Name == "Lights");
+        var command = h.Session.VoiceCommands.First(v => v.ButtonId == lights.Id);
+        await h.Session.DeleteButtonAsync(lights.Id);
+        await h.Shell.Voice.Pending;
+
+        h.Voice.Raise(command, lights);
+        await h.Shell.Voice.Pending;
+
+        Assert.Empty(h.Sender.Sent);
+    }
+
+    [Fact]
+    public async Task SwitchingToManualToggle_DuringGrace_KeepsListening()
+    {
+        await using var h = await WithModeAsync("PushToTalk");
+        await h.Shell.Voice.StartCommand.ExecuteAsync(null);
+        h.Ptt.Raise(true);
+        h.Ptt.Raise(false);
+
+        h.Shell.Voice.Mode = "ManualToggle";
+        await h.Shell.Voice.SaveSettingsCommand.ExecuteAsync(null);
+        await h.Shell.Voice.Pending;
+
+        Assert.Equal(0, h.Ui.Fire(Grace));
+        Assert.Equal(LinkState.Online, h.Shell.Voice.State);
+        Assert.False(h.Voice.Paused);
+        Assert.True(h.Voice.GateOpen);
+    }
+
+    [Fact]
+    public async Task SwitchingToManualToggle_WhilePttHeld_StaysOnline()
+    {
+        await using var h = await WithModeAsync("PushToTalk");
+        await h.Shell.Voice.StartCommand.ExecuteAsync(null);
+        h.Ptt.Raise(true);
+        h.Ptt.HeldWhenStopped = true;
+
+        h.Shell.Voice.Mode = "ManualToggle";
+        await h.Shell.Voice.SaveSettingsCommand.ExecuteAsync(null);
+        await h.Shell.Voice.Pending;
+
+        Assert.Equal(LinkState.Online, h.Shell.Voice.State);
+        Assert.True(h.Voice.GateOpen);
+        Assert.Equal(0, h.Ui.Fire(Grace));
+    }
+
+    [Fact]
     public async Task Stop_GoesOffline_AndStopsMonitor()
     {
         await using var h = await WithModeAsync("PushToTalk");

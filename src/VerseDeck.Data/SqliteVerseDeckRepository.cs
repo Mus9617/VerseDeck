@@ -344,6 +344,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
     {
         var repo = new SqliteVerseDeckRepository(connection.DataSource);
         var profiles = await repo.GetProfilesAsync(cancellationToken);
+        var freshDatabase = profiles.Count == 0;
         var profile = profiles.FirstOrDefault(p => p.IsActive);
         if (profile is null)
         {
@@ -360,9 +361,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             return;
         }
 
-        // Databases created before the seed marker existed already hold the user's deck.
-        var existingButtons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
-        if (existingButtons.Count == 0)
+        // Databases created before the seed marker existed already hold the user's deck, even if it is empty.
+        if (freshDatabase)
         {
             foreach (var preset in DefaultButtonPresets)
             {

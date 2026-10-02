@@ -49,7 +49,8 @@ public sealed class MobilePanelServer : IAsyncDisposable
         // Every route is LAN-only; everything except the page and pairing also needs a paired token.
         app.Use(async (context, next) =>
         {
-            if (!IsPrivateLan(context.Connection.RemoteIpAddress))
+            // A page in the PC's browser could reach this server through a rebound DNS name; real clients use the IP.
+            if (!IsPrivateLan(context.Connection.RemoteIpAddress) || !IsAddressOrLocalhost(context.Request.Host.Host))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
@@ -137,13 +138,19 @@ public sealed class MobilePanelServer : IAsyncDisposable
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
             var id = Guid.NewGuid().ToString("N");
             _devices[id] = new ConnectedDevice(id, "Mobile browser", context.Connection.RemoteIpAddress?.ToString() ?? "unknown", DateTimeOffset.Now);
+            // Stopping the server must end open sockets at once, not after the host's shutdown timeout.
+            using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, app.Lifetime.ApplicationStopping);
             try
             {
-                await ReceiveLoop(socket, cancellationToken);
+                await ReceiveLoop(socket, stopping.Token);
             }
             catch (WebSocketException)
             {
                 // The phone dropped off the network without closing the socket.
+            }
+            catch (OperationCanceledException)
+            {
+                // The server is stopping.
             }
             finally
             {
@@ -242,6 +249,7 @@ public sealed class MobilePanelServer : IAsyncDisposable
             throw new InvalidOperationException("Confirmacion requerida");
         }
 
+        button.Action.Validate();
         await _inputSender.SendAsync(button.Action, cancellationToken);
         await _repository.AddCommandLogAsync("Mobile", button.Name, $"Sent {button.Action.Key}", cancellationToken);
         Diagnostic?.Invoke(this, $"Mobile sent {button.Name} => {button.Action.Key}");
@@ -269,6 +277,12 @@ public sealed class MobilePanelServer : IAsyncDisposable
             || bytes[0] == 172 && bytes[1] is >= 16 and <= 31
             || bytes[0] == 192 && bytes[1] == 168
             || bytes[0] == 169 && bytes[1] == 254;
+    }
+
+    private static bool IsAddressOrLocalhost(string host)
+    {
+        return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || IPAddress.TryParse(host.Trim('[', ']'), out _);
     }
 
     private static string GetLocalIpAddress()

@@ -34,7 +34,12 @@ public sealed class TempDatabase : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
-        SqliteConnection.ClearAllPools();
+        // Only this database's pool: clearing every pool would close connections other test classes are using.
+        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path }.ToString()))
+        {
+            SqliteConnection.ClearPool(connection);
+        }
+
         try
         {
             File.Delete(Path);

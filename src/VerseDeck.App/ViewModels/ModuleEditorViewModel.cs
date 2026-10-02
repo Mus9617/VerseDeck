@@ -10,8 +10,6 @@ namespace VerseDeck.App.ViewModels;
 
 public sealed partial class ModuleEditorViewModel : ObservableObject
 {
-    private static readonly string[] AllowedModifiers = ["Ctrl", "Control", "Shift", "Alt"];
-
     private readonly DeckSession _session;
     private readonly IDialogService _dialogs;
     private readonly IStatusSink _status;
@@ -222,7 +220,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
         }
 
         var modifiers = Modifiers.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var unknown = modifiers.FirstOrDefault(m => !AllowedModifiers.Contains(m, StringComparer.OrdinalIgnoreCase));
+        var unknown = modifiers.FirstOrDefault(m => !KeyPressAction.AllowedModifiers.Contains(m, StringComparer.OrdinalIgnoreCase));
         if (unknown is not null)
         {
             _status.Error($"Modificador no soportado: '{unknown}'. Usa Ctrl, Shift o Alt.");

@@ -14,6 +14,8 @@ public class ThemeServiceTests
     [InlineData("Anvil Carrack", ThemeId.Anvil)]
     [InlineData("RSI Polaris", ThemeId.Neutral)]
     [InlineData("Drakestone", ThemeId.Neutral)]
+    [InlineData("Drake,Origin X", ThemeId.Neutral)]
+    [InlineData("2 Fast", ThemeId.Neutral)]
     [InlineData("Mi nave", ThemeId.Neutral)]
     [InlineData("", ThemeId.Neutral)]
     [InlineData(null, ThemeId.Neutral)]

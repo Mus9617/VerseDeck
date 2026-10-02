@@ -8,9 +8,7 @@ public static class ShipCatalog
     public static ThemeId ThemeFor(string? shipName)
     {
         var manufacturer = (shipName ?? string.Empty).Trim().Split(' ', 2)[0];
-        return Enum.TryParse<ThemeId>(manufacturer, ignoreCase: true, out var theme) && Enum.IsDefined(theme) && !int.TryParse(manufacturer, out _)
-            ? theme
-            : ThemeId.Neutral;
+        return ThemeService.TryParseTheme(manufacturer, out var theme) ? theme : ThemeId.Neutral;
     }
 
     public static readonly IReadOnlyList<string> Names =

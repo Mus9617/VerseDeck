@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Diagnostics;
 using System.Net.Sockets;
+using System.Net.WebSockets;
+using System.Text;
 using System.Text.Json;
 using VerseDeck.Core.Models;
 using VerseDeck.Data;
@@ -156,5 +159,72 @@ public sealed class MobileServerTests : IAsyncLifetime
         await Assert.ThrowsAnyAsync<Exception>(() => second.StartAsync(_port, Pin));
 
         Assert.False(second.IsRunning);
+    }
+
+    private async Task<ClientWebSocket> ConnectSocketAsync()
+    {
+        await PairAsync();
+        var socket = new ClientWebSocket();
+        var token = _http.DefaultRequestHeaders.Authorization!.Parameter;
+        await socket.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/ws?token={token}"), CancellationToken.None);
+        return socket;
+    }
+
+    [Fact]
+    public async Task WebSocket_WithoutToken_IsRejected()
+    {
+        using var socket = new ClientWebSocket();
+
+        await Assert.ThrowsAnyAsync<WebSocketException>(() => socket.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/ws"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task WebSocket_PressMessage_SendsExactlyOneKeyPress()
+    {
+        using var socket = await ConnectSocketAsync();
+        var button = await ButtonAsync("Lights");
+
+        var message = JsonSerializer.Serialize(new { type = "press", buttonId = button.Id, confirmed = false });
+        await socket.SendAsync(Encoding.UTF8.GetBytes(message), WebSocketMessageType.Text, true, CancellationToken.None);
+        var buffer = new byte[256];
+        var reply = await socket.ReceiveAsync(buffer, CancellationToken.None);
+
+        Assert.Contains("\"ok\":true", Encoding.UTF8.GetString(buffer, 0, reply.Count));
+        Assert.Equal("L", Assert.Single(_sender.Sent).Key);
+    }
+
+    [Fact]
+    public async Task Stop_WithOpenWebSocket_ReturnsPromptly()
+    {
+        using var socket = await ConnectSocketAsync();
+        var watch = Stopwatch.StartNew();
+
+        await _server.StopAsync();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"StopAsync took {watch.Elapsed.TotalSeconds:0.0} s");
+    }
+
+    [Fact]
+    public async Task Request_WithForeignHostHeader_Returns403()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        request.Headers.Host = "evil.example";
+
+        var response = await _http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Press_LegacyChordModifiers_Returns400_AndSendsNothing()
+    {
+        await PairAsync();
+        var button = await ButtonAsync("Lights");
+        await _db.ExecuteAsync($"UPDATE Buttons SET ActionModifiers='[\"A\",\"B\"]' WHERE Id={button.Id}");
+
+        var response = await _http.PostAsJsonAsync("/api/press", new { type = "press", buttonId = button.Id, confirmed = false });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_sender.Sent);
     }
 }

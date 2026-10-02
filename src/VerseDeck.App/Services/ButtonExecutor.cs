@@ -36,6 +36,7 @@ public sealed class ButtonExecutor
 
         try
         {
+            button.Action.Validate();
             await _sender.SendAsync(button.Action);
             await _repository.AddCommandLogAsync(source, button.Name, $"Sent {ActionText.Display(button.Action)}");
             _log.Write($"{source} sent {button.Name} => {ActionText.Display(button.Action)}");

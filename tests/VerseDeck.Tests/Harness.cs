@@ -109,7 +109,17 @@ public sealed class FakePttMonitor : IPttMonitor
         Binding = binding;
     }
 
-    public void Stop() => Running = false;
+    // The real monitor reports a release when it stops while the button is held.
+    public bool HeldWhenStopped { get; set; }
+
+    public void Stop()
+    {
+        Running = false;
+        if (HeldWhenStopped)
+        {
+            PressedChanged?.Invoke(this, false);
+        }
+    }
 
     public bool AnyInputPressed() => AnyPressed;
 
@@ -165,6 +175,7 @@ public sealed class Harness : IAsyncDisposable
     public FakeMobileLink Mobile { get; } = new();
     public List<ThemeId> AppliedThemes { get; } = [];
     public int DebugConsoleOpens { get; private set; }
+    public DateTimeOffset Now { get; set; } = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
     public SqliteVerseDeckRepository Repository { get; private set; } = null!;
     public DeckSession Session { get; private set; } = null!;
     public ShellViewModel Shell { get; private set; } = null!;
@@ -187,7 +198,8 @@ public sealed class Harness : IAsyncDisposable
             harness.Ptt,
             harness.Mobile,
             new ThemeService(harness.AppliedThemes.Add),
-            () => harness.DebugConsoleOpens++));
+            () => harness.DebugConsoleOpens++,
+            () => harness.Now));
         if (initialize)
         {
             await harness.Shell.InitializeAsync();

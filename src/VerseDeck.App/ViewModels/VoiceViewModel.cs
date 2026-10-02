@@ -12,6 +12,9 @@ public sealed partial class VoiceViewModel : ObservableObject
     public static readonly TimeSpan ReleaseGrace = TimeSpan.FromSeconds(2.5);
     public static readonly TimeSpan DetectInterval = TimeSpan.FromMilliseconds(35);
 
+    // Several installed recognizers hear the same utterance; only the first report may send a press.
+    public static readonly TimeSpan RecognitionDebounce = TimeSpan.FromMilliseconds(750);
+
     private const string PushToTalk = "PushToTalk";
 
     private readonly DeckSession _session;
@@ -20,6 +23,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     private readonly ButtonExecutor _executor;
     private readonly IStatusSink _status;
     private readonly IUiScheduler _ui;
+    private readonly Func<DateTimeOffset> _clock;
+    private DateTimeOffset _lastRecognition = DateTimeOffset.MinValue;
     private IDisposable? _graceTimer;
     private bool _busy;
     private bool _waitingForRelease;
@@ -45,8 +50,9 @@ public sealed partial class VoiceViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetecting;
 
-    public VoiceViewModel(DeckSession session, IVoiceCommandService voice, IPttMonitor ptt, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, IDebugLog log)
+    public VoiceViewModel(DeckSession session, IVoiceCommandService voice, IPttMonitor ptt, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, IDebugLog log, Func<DateTimeOffset> clock)
     {
+        _clock = clock;
         _session = session;
         _voice = voice;
         _ptt = ptt;
@@ -187,6 +193,8 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     private async Task StartEngineAsync()
     {
+        // A pause scheduled by the previous engine must not land on the new one.
+        _graceTimer?.Dispose();
         var settings = _session.Settings;
         var commands = _session.VoiceCommands
             .Select(c => c with { MinimumConfidence = Math.Min(c.MinimumConfidence, settings.VoiceMinimumConfidence) })
@@ -264,7 +272,7 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     private void OnPttChanged(bool pressed)
     {
-        if (State == LinkState.Offline)
+        if (State == LinkState.Offline || _session.Settings.VoiceActivationMode != PushToTalk)
         {
             return;
         }
@@ -292,8 +300,16 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     private async Task HandleRecognizedAsync(VoiceRecognizedEventArgs e)
     {
-        RequestSelect?.Invoke(e.Button.Id);
-        var button = _session.Buttons.FirstOrDefault(b => b.Id == e.Button.Id) ?? e.Button;
+        // Never act on a recognition the user cannot see coming: voice off, module gone, or an echo of the last one.
+        var now = _clock();
+        var button = _session.Buttons.FirstOrDefault(b => b.Id == e.Button.Id);
+        if (State == LinkState.Offline || button is null || now - _lastRecognition < RecognitionDebounce)
+        {
+            return;
+        }
+
+        _lastRecognition = now;
+        RequestSelect?.Invoke(button.Id);
         var result = await _executor.ExecuteAsync(button, "Voice");
         StatusText = $"Reconocido: {e.Command.Phrase} ({e.Confidence.ToString("0.00", CultureInfo.CurrentCulture)})";
         if (result == ExecuteResult.Sent)

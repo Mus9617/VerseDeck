@@ -174,7 +174,8 @@ public sealed record ShellServices(
     IPttMonitor Ptt,
     IMobileLink Mobile,
     ThemeService Themes,
-    Action OpenDebugConsole);
+    Action OpenDebugConsole,
+    Func<DateTimeOffset>? Clock = null);
 
 public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 {
@@ -205,7 +206,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Editor = new ModuleEditorViewModel(services.Session, services.Dialogs, this);
         Profile = new ProfileViewModel(services.Session, this);
         Activity = new ActivityViewModel(services.Repository);
-        Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log);
+        Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now));
         Mobile = new MobileLinkViewModel(services.Session, services.Mobile, this);
         Settings = new SettingsViewModel(services.Session, services.Themes, this, services.OpenDebugConsole);
 

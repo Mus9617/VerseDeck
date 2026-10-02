@@ -29,8 +29,15 @@ public partial class MainWindow : Window
 
         // Voice and the mobile server must stop before the process exits.
         e.Cancel = true;
-        await _shell.ShutdownAsync();
-        _shutdownComplete = true;
+        try
+        {
+            await _shell.ShutdownAsync();
+        }
+        finally
+        {
+            // A failed shutdown must not leave a window that can never be closed.
+            _shutdownComplete = true;
+        }
 
         // Close cannot be called from inside the Closing handler when shutdown finishes synchronously.
         _ = Dispatcher.BeginInvoke(Close);

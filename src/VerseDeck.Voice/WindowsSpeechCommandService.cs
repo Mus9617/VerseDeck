@@ -89,11 +89,22 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
     {
         foreach (var engine in _engines.ToList())
         {
-            engine.SpeechRecognized -= OnSpeechRecognized;
-            engine.SpeechRecognitionRejected -= OnSpeechRejected;
-            engine.RecognizeAsyncCancel();
-            engine.RecognizeAsyncStop();
-            engine.Dispose();
+            // One engine failing to stop must not leave the others listening.
+            try
+            {
+                engine.SpeechRecognized -= OnSpeechRecognized;
+                engine.SpeechRecognitionRejected -= OnSpeechRejected;
+                engine.RecognizeAsyncCancel();
+                engine.RecognizeAsyncStop();
+            }
+            catch (Exception ex)
+            {
+                Diagnostic?.Invoke(this, $"Voice engine failed to stop cleanly: {ex.Message}");
+            }
+            finally
+            {
+                engine.Dispose();
+            }
         }
 
         _engines.Clear();

@@ -77,4 +77,36 @@ public class PairingGuardTests
 
         Assert.Equal(PairStatus.Ok, guard.TryPair("192.168.1.21", "7391").Status);
     }
+
+    [Fact]
+    public void ParallelWrongPins_NeverGetMoreThanMaxFailuresTries()
+    {
+        var guard = CreateGuard();
+        var evaluated = 0;
+
+        Parallel.For(0, 500, _ =>
+        {
+            if (guard.TryPair("192.168.1.20", "0000").Status == PairStatus.WrongPin)
+            {
+                Interlocked.Increment(ref evaluated);
+            }
+        });
+
+        Assert.Equal(PairingGuard.MaxFailures, evaluated);
+    }
+
+    [Fact]
+    public void FailuresSpreadOverManyAddresses_LockPairingForEveryone()
+    {
+        var guard = CreateGuard();
+        for (var i = 0; i < PairingGuard.MaxGlobalFailures; i++)
+        {
+            guard.TryPair($"fe80::{i + 1}", "0000");
+        }
+
+        Assert.Equal(PairStatus.LockedOut, guard.TryPair("192.168.1.99", "7391").Status);
+
+        _now += PairingGuard.Lockout + TimeSpan.FromSeconds(1);
+        Assert.Equal(PairStatus.Ok, guard.TryPair("192.168.1.99", "7391").Status);
+    }
 }

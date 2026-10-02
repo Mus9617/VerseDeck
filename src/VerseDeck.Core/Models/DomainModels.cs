@@ -54,6 +54,8 @@ public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers,
 {
     public const int MaxPressDurationMs = 250;
 
+    public static readonly IReadOnlyList<string> AllowedModifiers = ["Ctrl", "Control", "Shift", "Alt"];
+
     public static KeyPressAction DefaultLandingGear => new("N", Array.Empty<string>(), 60);
 
     public KeyPressAction Validate()
@@ -71,6 +73,13 @@ public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers,
         if (Modifiers.Count > 3)
         {
             throw new InvalidOperationException("A key press action can have at most three modifiers.");
+        }
+
+        // Anything else held with the key would turn one press into a chord of several keys.
+        var unknown = Modifiers.FirstOrDefault(m => !AllowedModifiers.Contains(m, StringComparer.OrdinalIgnoreCase));
+        if (unknown is not null)
+        {
+            throw new InvalidOperationException($"'{unknown}' is not a modifier. Use Ctrl, Shift or Alt.");
         }
 
         return this;

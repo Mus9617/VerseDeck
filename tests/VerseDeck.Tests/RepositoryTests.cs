@@ -96,4 +96,40 @@ public class RepositoryTests
 
         Assert.Equal(0.40, (await repository.GetSettingsAsync()).VoiceMinimumConfidence, 3);
     }
+
+    [Fact]
+    public async Task LegacyDatabase_WithEveryModuleDeleted_IsNotReseeded()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        foreach (var button in await ActiveButtonsAsync(repository))
+        {
+            await repository.DeleteButtonAsync(button.Id);
+        }
+
+        await db.ExecuteAsync("DELETE FROM Settings WHERE Key='DefaultDeckSeededV1'");
+
+        await repository.InitializeAsync();
+
+        Assert.Empty(await ActiveButtonsAsync(repository));
+    }
+
+    [Theory]
+    [InlineData("A")]
+    [InlineData("F5")]
+    [InlineData("Hyper")]
+    public void Validate_NonModifierKeyAsModifier_Throws(string modifier)
+    {
+        Assert.Throws<InvalidOperationException>(() => new KeyPressAction("C", ["Ctrl", modifier], 60).Validate());
+    }
+
+    [Theory]
+    [InlineData("Ctrl")]
+    [InlineData("control")]
+    [InlineData("SHIFT")]
+    [InlineData("Alt")]
+    public void Validate_RealModifier_IsAccepted(string modifier)
+    {
+        Assert.Equal("C", new KeyPressAction("C", [modifier], 60).Validate().Key);
+    }
 }

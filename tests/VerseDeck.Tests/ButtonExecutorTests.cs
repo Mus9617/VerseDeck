@@ -83,4 +83,15 @@ public sealed class ButtonExecutorTests : IAsyncLifetime
 
         Assert.Equal(0, _audio.CommandPlays);
     }
+
+    [Fact]
+    public async Task Execute_LegacyChordModifiers_FailsWithoutSending()
+    {
+        var chord = Button("Lights") with { Action = new KeyPressAction("C", ["A", "B"], 60) };
+
+        var result = await _executor.ExecuteAsync(chord, "Windows");
+
+        Assert.Equal(ExecuteResult.Failed, result);
+        Assert.Empty(_sender.Sent);
+    }
 }
