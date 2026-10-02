@@ -17,7 +17,8 @@ public sealed record DeckButton(
     KeyPressAction Action,
     bool RequiresConfirmation,
     bool MobileHaptics,
-    string GameAction = "");
+    string GameAction = "",
+    string Response = "");
 
 public sealed record VoiceCommand(
     long Id,
@@ -50,7 +51,14 @@ public sealed record AppSettings(
     string PushToTalkBinding = "F13",
     bool CommandSoundEnabled = true,
     bool WelcomeSoundEnabled = true,
-    string GameFolder = "");
+    string GameFolder = "",
+    bool CopilotEnabled = false,
+    string CopilotVoice = "",
+    string CopilotPack = "sobria",
+    double CopilotVolume = 0.8,
+    bool CopilotVoiceOnly = false,
+    string CopilotMutedCategories = "",
+    bool CopilotGreeting = false);
 
 public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers, int PressDurationMs)
 {

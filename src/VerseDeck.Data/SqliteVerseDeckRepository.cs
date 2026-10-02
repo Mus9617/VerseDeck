@@ -93,6 +93,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         """;
         await command.ExecuteNonQueryAsync(cancellationToken);
         await EnsureColumnAsync(connection, "Buttons", "GameAction", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(connection, "Buttons", "Response", "TEXT NOT NULL DEFAULT ''", cancellationToken);
         await EnsureDefaultDeckAsync(connection, cancellationToken);
     }
 
@@ -119,7 +120,14 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             values.GetValueOrDefault("PushToTalkBinding", "F13"),
             bool.Parse(values.GetValueOrDefault("CommandSoundEnabled", "True")),
             bool.Parse(values.GetValueOrDefault("WelcomeSoundEnabled", "True")),
-            values.GetValueOrDefault("GameFolder", string.Empty));
+            values.GetValueOrDefault("GameFolder", string.Empty),
+            bool.Parse(values.GetValueOrDefault("CopilotEnabled", "False")),
+            values.GetValueOrDefault("CopilotVoice", string.Empty),
+            values.GetValueOrDefault("CopilotPack", "sobria"),
+            ParseVolume(values.GetValueOrDefault("CopilotVolume", "0.80")),
+            bool.Parse(values.GetValueOrDefault("CopilotVoiceOnly", "False")),
+            values.GetValueOrDefault("CopilotMutedCategories", string.Empty),
+            bool.Parse(values.GetValueOrDefault("CopilotGreeting", "False")));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -136,6 +144,13 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await UpsertSetting(connection, "CommandSoundEnabled", settings.CommandSoundEnabled.ToString(), cancellationToken);
         await UpsertSetting(connection, "WelcomeSoundEnabled", settings.WelcomeSoundEnabled.ToString(), cancellationToken);
         await UpsertSetting(connection, "GameFolder", settings.GameFolder, cancellationToken);
+        await UpsertSetting(connection, "CopilotEnabled", settings.CopilotEnabled.ToString(), cancellationToken);
+        await UpsertSetting(connection, "CopilotVoice", settings.CopilotVoice, cancellationToken);
+        await UpsertSetting(connection, "CopilotPack", settings.CopilotPack, cancellationToken);
+        await UpsertSetting(connection, "CopilotVolume", settings.CopilotVolume.ToString("0.00", CultureInfo.InvariantCulture), cancellationToken);
+        await UpsertSetting(connection, "CopilotVoiceOnly", settings.CopilotVoiceOnly.ToString(), cancellationToken);
+        await UpsertSetting(connection, "CopilotMutedCategories", settings.CopilotMutedCategories, cancellationToken);
+        await UpsertSetting(connection, "CopilotGreeting", settings.CopilotGreeting.ToString(), cancellationToken);
     }
 
     public async Task<IReadOnlyList<Profile>> GetProfilesAsync(CancellationToken cancellationToken = default)
@@ -187,7 +202,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await using var connection = await OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
         command.CommandText = """
-        SELECT Id, ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction
+        SELECT Id, ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction, Response
         FROM Buttons WHERE ProfileId=$profileId ORDER BY Name
         """;
         command.Parameters.AddWithValue("$profileId", profileId);
@@ -199,7 +214,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             results.Add(new DeckButton(
                 reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
                 reader.GetString(5), new KeyPressAction(reader.GetString(6), modifiers, reader.GetInt32(8)),
-                reader.GetInt32(9) == 1, reader.GetInt32(10) == 1, reader.GetString(11)));
+                reader.GetInt32(9) == 1, reader.GetInt32(10) == 1, reader.GetString(11), reader.GetString(12)));
         }
 
         return results;
@@ -213,8 +228,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         if (button.Id == 0)
         {
             command.CommandText = """
-            INSERT INTO Buttons (ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction)
-            VALUES ($profileId, $name, $icon, $accent, $category, $key, $modifiers, $duration, $confirm, $haptics, $gameAction);
+            INSERT INTO Buttons (ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction, Response)
+            VALUES ($profileId, $name, $icon, $accent, $category, $key, $modifiers, $duration, $confirm, $haptics, $gameAction, $response);
             SELECT last_insert_rowid();
             """;
         }
@@ -222,7 +237,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
             command.CommandText = """
             UPDATE Buttons SET ProfileId=$profileId, Name=$name, Icon=$icon, AccentColor=$accent, Category=$category,
-            ActionKey=$key, ActionModifiers=$modifiers, PressDurationMs=$duration, RequiresConfirmation=$confirm, MobileHaptics=$haptics, GameAction=$gameAction
+            ActionKey=$key, ActionModifiers=$modifiers, PressDurationMs=$duration, RequiresConfirmation=$confirm, MobileHaptics=$haptics, GameAction=$gameAction, Response=$response
             WHERE Id=$id; SELECT $id;
             """;
             command.Parameters.AddWithValue("$id", button.Id);
@@ -239,6 +254,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         command.Parameters.AddWithValue("$confirm", button.RequiresConfirmation ? 1 : 0);
         command.Parameters.AddWithValue("$haptics", button.MobileHaptics ? 1 : 0);
         command.Parameters.AddWithValue("$gameAction", button.GameAction ?? string.Empty);
+        command.Parameters.AddWithValue("$response", button.Response ?? string.Empty);
         var id = (long)(await command.ExecuteScalarAsync(cancellationToken) ?? button.Id);
         return button with { Id = id };
     }
@@ -404,6 +420,11 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         }
 
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
+    }
+
+    private static double ParseVolume(string text)
+    {
+        return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? Math.Clamp(value, 0, 1) : 0.8;
     }
 
     private static double ParseConfidence(string text)

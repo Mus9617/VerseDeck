@@ -190,4 +190,80 @@ public class RepositoryTests
         Assert.All(buttons, b => Assert.Equal("", b.GameAction));
         Assert.Equal(phrases, (await repository.GetVoiceCommandsAsync()).Count);
     }
+
+    [Fact]
+    public async Task Response_RoundTrips()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        var lights = (await ActiveButtonsAsync(repository)).First(b => b.Name == "Lights");
+
+        await repository.SaveButtonAsync(lights with { Response = "Luces.|Hecho, luces." });
+
+        Assert.Equal("Luces.|Hecho, luces.", (await ActiveButtonsAsync(repository)).First(b => b.Name == "Lights").Response);
+        Assert.Equal("", (await ActiveButtonsAsync(repository)).First(b => b.Name == "Cargo").Response);
+    }
+
+    [Fact]
+    public async Task CopilotSettings_RoundTrip_UnderSpanishCulture()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("es-ES");
+        try
+        {
+            await using var db = new TempDatabase();
+            var repository = await db.CreateAsync();
+
+            await repository.SaveSettingsAsync((await repository.GetSettingsAsync()) with
+            {
+                CopilotEnabled = true,
+                CopilotVoice = "piper-davefx",
+                CopilotPack = "militar",
+                CopilotVolume = 0.65,
+                CopilotVoiceOnly = true,
+                CopilotMutedCategories = "Combat,Scan",
+                CopilotGreeting = true
+            });
+
+            var settings = await repository.GetSettingsAsync();
+            Assert.True(settings.CopilotEnabled);
+            Assert.Equal("piper-davefx", settings.CopilotVoice);
+            Assert.Equal("militar", settings.CopilotPack);
+            Assert.Equal(0.65, settings.CopilotVolume, 3);
+            Assert.True(settings.CopilotVoiceOnly);
+            Assert.Equal("Combat,Scan", settings.CopilotMutedCategories);
+            Assert.True(settings.CopilotGreeting);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Fact]
+    public async Task FreshDatabase_HasCopilotDisabled()
+    {
+        await using var db = new TempDatabase();
+        var settings = await (await db.CreateAsync()).GetSettingsAsync();
+
+        Assert.False(settings.CopilotEnabled);
+        Assert.False(settings.CopilotGreeting);
+        Assert.Equal("", settings.CopilotVoice);
+        Assert.Equal("sobria", settings.CopilotPack);
+        Assert.Equal(0.8, settings.CopilotVolume, 3);
+    }
+
+    [Fact]
+    public async Task DatabaseWithoutResponseColumn_IsUpgraded()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        await db.ExecuteAsync("ALTER TABLE Buttons DROP COLUMN Response");
+
+        await repository.InitializeAsync();
+
+        var buttons = await ActiveButtonsAsync(repository);
+        Assert.Equal(16, buttons.Count);
+        Assert.All(buttons, b => Assert.Equal("", b.Response));
+    }
 }
