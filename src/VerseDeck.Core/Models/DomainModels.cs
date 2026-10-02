@@ -101,7 +101,11 @@ public interface IInputSender
 public interface IVoiceCommandService : IDisposable
 {
     event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
+    event EventHandler<string>? Diagnostic;
     bool IsRunning { get; }
+    void PauseRecognition();
+    void ResumeRecognition();
+    void SetInputGate(bool isOpen, TimeSpan? releaseGrace = null);
     Task StartAsync(IReadOnlyList<VoiceCommand> commands, IReadOnlyList<DeckButton> buttons, CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
 }

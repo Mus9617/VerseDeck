@@ -653,7 +653,7 @@ public partial class MainWindow : Window
     {
         if (_pttDetectWaitingForRelease)
         {
-            if (PttInputMonitor.AnyInputPressed())
+            if (_pttMonitor.AnyInputPressed())
             {
                 return;
             }
@@ -665,7 +665,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!PttInputMonitor.TryDetectPressed(out var detected))
+        if (!_pttMonitor.TryDetectPressed(out var detected))
         {
             return;
         }

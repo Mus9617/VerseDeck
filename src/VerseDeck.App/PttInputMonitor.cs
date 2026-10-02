@@ -1,10 +1,11 @@
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using VerseDeck.App.Services;
 using VerseDeck.Input;
 
 namespace VerseDeck.App;
 
-public sealed class PttInputMonitor : IDisposable
+public sealed class PttInputMonitor : IPttMonitor, IDisposable
 {
     private readonly DispatcherTimer _timer = new();
     private bool _isPressed;
@@ -93,7 +94,7 @@ public sealed class PttInputMonitor : IDisposable
         return (GetAsyncKeyState(vk) & 0x8000) != 0;
     }
 
-    public static bool AnyInputPressed()
+    public bool AnyInputPressed()
     {
         if (TryDetectPressed(out _))
         {
@@ -103,7 +104,7 @@ public sealed class PttInputMonitor : IDisposable
         return false;
     }
 
-    public static bool TryDetectPressed(out PttBinding binding)
+    public bool TryDetectPressed(out PttBinding binding)
     {
         foreach (var mouse in MouseBindings)
         {
