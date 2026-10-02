@@ -239,15 +239,8 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
 
     private static bool IsSupportedKey(string key)
     {
-        try
-        {
-            KeyMap.ToVirtualKey(key);
-            return true;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            return false;
-        }
+        // Mouse buttons are valid names for push-to-talk but cannot be sent as a module key.
+        return KeyMap.IsSupported(key) && !key.StartsWith("MOUSE_", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task RunAsync(Func<Task> work)

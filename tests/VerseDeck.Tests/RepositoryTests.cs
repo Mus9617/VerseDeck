@@ -132,4 +132,20 @@ public class RepositoryTests
     {
         Assert.Equal("C", new KeyPressAction("C", [modifier], 60).Validate().Key);
     }
+
+    [Theory]
+    [InlineData("RAlt")]
+    [InlineData("lctrl")]
+    [InlineData("RShift")]
+    public void Validate_SidedModifier_IsAccepted(string modifier)
+    {
+        Assert.Equal("C", new KeyPressAction("C", [modifier], 60).Validate().Key);
+    }
+
+    [Fact]
+    public void Validate_Duration2000_IsAccepted_2001_Throws()
+    {
+        Assert.Equal(2000, new KeyPressAction("C", [], 2000).Validate().PressDurationMs);
+        Assert.Throws<InvalidOperationException>(() => new KeyPressAction("C", [], 2001).Validate());
+    }
 }

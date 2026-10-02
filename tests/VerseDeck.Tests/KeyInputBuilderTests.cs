@@ -57,4 +57,56 @@ public class KeyInputBuilderTests
     {
         Assert.Throws<InvalidOperationException>(() => KeyInputBuilder.Down(new KeyPressAction("ñ", [], 60), FakeScanCode));
     }
+
+    [Theory]
+    [InlineData("RAlt", 0xA5, true)]
+    [InlineData("RCtrl", 0xA3, true)]
+    [InlineData("LAlt", 0xA4, false)]
+    [InlineData("LShift", 0xA0, false)]
+    public void SidedModifier_MapsToItsOwnKey(string modifier, int virtualKey, bool extended)
+    {
+        var stroke = KeyInputBuilder.Down(new KeyPressAction("R", [modifier], 60), FakeScanCode)[0];
+
+        Assert.Equal((ushort)virtualKey, stroke.VirtualKey);
+        Assert.Equal(extended, stroke.Extended);
+    }
+
+    [Fact]
+    public void PunctuationKey_UsesFixedScanCode_NotTheLayout()
+    {
+        var asked = new List<ushort>();
+        var stroke = KeyInputBuilder.Down(new KeyPressAction("COMMA", [], 60), vk => { asked.Add(vk); return 0x99; }).Single();
+
+        Assert.Equal(0, stroke.VirtualKey);
+        Assert.Equal(0x33, stroke.ScanCode);
+        Assert.Empty(asked);
+    }
+
+    [Fact]
+    public void NumpadDivide_IsExtended()
+    {
+        Assert.True(KeyInputBuilder.Down(new KeyPressAction("NP_DIVIDE", [], 60), FakeScanCode).Single().Extended);
+    }
+
+    [Theory]
+    [InlineData("COMMA")]
+    [InlineData("backslash")]
+    [InlineData("NP_5")]
+    [InlineData("PGUP")]
+    [InlineData("RALT")]
+    [InlineData("capslock")]
+    public void IsSupported_NewKeys(string key)
+    {
+        Assert.True(KeyMap.IsSupported(key));
+    }
+
+    [Theory]
+    [InlineData("ñ")]
+    [InlineData("F99")]
+    [InlineData("")]
+    [InlineData("mouse5")]
+    public void IsSupported_RejectsUnknownKeys(string key)
+    {
+        Assert.False(KeyMap.IsSupported(key));
+    }
 }

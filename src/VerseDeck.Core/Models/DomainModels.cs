@@ -52,9 +52,11 @@ public sealed record AppSettings(
 
 public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers, int PressDurationMs)
 {
-    public const int MaxPressDurationMs = 250;
+    // Some game actions only trigger while the key is held; it is still one key, pressed once.
+    public const int MaxPressDurationMs = 2000;
 
-    public static readonly IReadOnlyList<string> AllowedModifiers = ["Ctrl", "Control", "Shift", "Alt"];
+    public static readonly IReadOnlyList<string> AllowedModifiers =
+        ["Ctrl", "Control", "Shift", "Alt", "LCtrl", "RCtrl", "LShift", "RShift", "LAlt", "RAlt"];
 
     public static KeyPressAction DefaultLandingGear => new("N", Array.Empty<string>(), 60);
 
