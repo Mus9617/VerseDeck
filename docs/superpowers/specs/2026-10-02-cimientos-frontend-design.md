@@ -1,7 +1,7 @@
 # Sub-proyecto 1 — Cimientos y frontend
 
 Fecha: 2026-10-02
-Estado: pendiente de revisión
+Estado: implementado en la rama `cimientos-frontend`
 
 ## Propósito
 
