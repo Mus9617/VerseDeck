@@ -5,37 +5,57 @@ namespace VerseDeck.Input;
 
 public sealed class WindowsInputSender : IInputSender
 {
-    public Task SendAsync(KeyPressAction action, CancellationToken cancellationToken = default)
+    private const uint KeyEventExtendedKey = 0x0001;
+    private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventScanCode = 0x0008;
+
+    public async Task SendAsync(KeyPressAction action, CancellationToken cancellationToken = default)
     {
         action.Validate();
         cancellationToken.ThrowIfCancellationRequested();
 
-        var inputs = new List<INPUT>();
-        foreach (var modifier in action.Modifiers)
+        // One press: keys go down, are held for the configured duration, then released.
+        var down = KeyInputBuilder.Down(action, ScanCodeOf);
+        var up = KeyInputBuilder.Up(action, ScanCodeOf);
+
+        Send(down);
+        try
         {
-            inputs.Add(KeyInput(modifier, false));
+            await Task.Delay(Math.Min(action.PressDurationMs, KeyPressAction.MaxPressDurationMs), cancellationToken);
         }
-
-        inputs.Add(KeyInput(action.Key, false));
-        inputs.Add(KeyInput(action.Key, true));
-
-        foreach (var modifier in action.Modifiers.Reverse())
+        finally
         {
-            inputs.Add(KeyInput(modifier, true));
+            Send(up);
         }
+    }
 
-        var sent = SendInput((uint)inputs.Count, inputs.ToArray(), INPUT.Size);
-        if (sent != inputs.Count)
+    private static ushort ScanCodeOf(ushort virtualKey) => (ushort)MapVirtualKey(virtualKey, 0);
+
+    private static void Send(IReadOnlyList<KeyStroke> strokes)
+    {
+        var inputs = strokes.Select(KeyInput).ToArray();
+        var sent = SendInput((uint)inputs.Length, inputs, INPUT.Size);
+        if (sent != inputs.Length)
         {
             throw new InvalidOperationException($"Windows SendInput did not accept the full key press. Win32 error: {Marshal.GetLastWin32Error()}.");
         }
-
-        return Task.Delay(Math.Min(action.PressDurationMs, KeyPressAction.MaxPressDurationMs), cancellationToken);
     }
 
-    private static INPUT KeyInput(string key, bool keyUp)
+    private static INPUT KeyInput(KeyStroke stroke)
     {
-        var virtualKey = KeyMap.ToVirtualKey(key);
+        // Games read scan codes; keys without one (mouse buttons, some F13-F24) fall back to the virtual key.
+        var useScanCode = stroke.ScanCode != 0;
+        var flags = stroke.KeyUp ? KeyEventKeyUp : 0u;
+        if (useScanCode)
+        {
+            flags |= KeyEventScanCode;
+        }
+
+        if (stroke.Extended)
+        {
+            flags |= KeyEventExtendedKey;
+        }
+
         return new INPUT
         {
             type = 1,
@@ -43,8 +63,9 @@ public sealed class WindowsInputSender : IInputSender
             {
                 ki = new KEYBDINPUT
                 {
-                    wVk = virtualKey,
-                    dwFlags = keyUp ? 0x0002u : 0u
+                    wVk = useScanCode ? (ushort)0 : stroke.VirtualKey,
+                    wScan = stroke.ScanCode,
+                    dwFlags = flags
                 }
             }
         };
@@ -52,6 +73,9 @@ public sealed class WindowsInputSender : IInputSender
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [DllImport("user32.dll")]
+    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
     [StructLayout(LayoutKind.Explicit, Size = Size)]
     private struct INPUT

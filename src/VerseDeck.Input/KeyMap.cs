@@ -46,7 +46,7 @@ public static class KeyMap
             }
         }
 
-        throw new InvalidOperationException($"Unsupported key '{key}'. Use letters, digits, F1-F12, arrows, or common keys.");
+        throw new InvalidOperationException($"Unsupported key '{key}'. Use letters, digits, F1-F24, arrows, or common keys.");
     }
 
     public static ushort ToVirtualKeyCode(string key) => ToVirtualKey(key);
