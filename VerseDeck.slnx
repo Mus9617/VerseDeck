@@ -7,6 +7,7 @@
     <Project Path="src/VerseDeck.Input/VerseDeck.Input.csproj" />
     <Project Path="src/VerseDeck.Market/VerseDeck.Market.csproj" />
     <Project Path="src/VerseDeck.MobileServer/VerseDeck.MobileServer.csproj" />
+    <Project Path="src/VerseDeck.Speech/VerseDeck.Speech.csproj" />
     <Project Path="src/VerseDeck.Voice/VerseDeck.Voice.csproj" />
   </Folder>
   <Folder Name="/tests/">

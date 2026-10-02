@@ -8,6 +8,7 @@
     <ProjectReference Include="..\VerseDeck.Voice\VerseDeck.Voice.csproj" />
     <ProjectReference Include="..\VerseDeck.MobileServer\VerseDeck.MobileServer.csproj" />
     <ProjectReference Include="..\VerseDeck.Market\VerseDeck.Market.csproj" />
+    <ProjectReference Include="..\VerseDeck.Speech\VerseDeck.Speech.csproj" />
   </ItemGroup>
 
   <ItemGroup>

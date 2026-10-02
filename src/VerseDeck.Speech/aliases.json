@@ -1,0 +1,18 @@
+{
+  "Flight Ready": "flight_ready",
+  "Power Toggle": "power_all",
+  "Engines Toggle": "power_thrusters",
+  "Landing Gear": "landing_gear",
+  "Lights": "headlights",
+  "Radar Ping": "ping",
+  "Scan Mode": "scan_mode",
+  "Quantum Mode": "master_mode",
+  "Star Map": "star_map",
+  "Shields": "power_shields",
+  "Weapons": "power_weapons",
+  "Doors": "doors_toggle",
+  "Cargo": "cargo",
+  "Comms": "comms",
+  "Eject": "eject",
+  "Self Destruct": "self_destruct"
+}

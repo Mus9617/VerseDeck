@@ -1,0 +1,76 @@
+{
+  "voices": [
+    {
+      "id": "piper-davefx",
+      "name": "Davefx (hombre, España)",
+      "engine": "piper",
+      "folder": "vits-piper-es_ES-davefx-medium",
+      "model": "es_ES-davefx-medium.onnx",
+      "speaker": 0,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-es_ES-davefx-medium.tar.bz2",
+      "bytes": 67184952,
+      "sha256": "a3f6beb54a9cb893279f72978a22f807a4d9fc9c7848157b524d5cc7b7f58b22",
+      "license": "Piper, datos CC0"
+    },
+    {
+      "id": "piper-sharvard-0",
+      "name": "Sharvard, voz 1 (España)",
+      "engine": "piper",
+      "folder": "vits-piper-es_ES-sharvard-medium",
+      "model": "es_ES-sharvard-medium.onnx",
+      "speaker": 0,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-es_ES-sharvard-medium.tar.bz2",
+      "bytes": 80318184,
+      "sha256": "b30a7a83df0518f0ee1c7039506648cade99f1f9b498fc49ed2ced2e2536bb5a",
+      "license": "Piper, datos Sharvard CC BY 3.0"
+    },
+    {
+      "id": "piper-sharvard-1",
+      "name": "Sharvard, voz 2 (España)",
+      "engine": "piper",
+      "folder": "vits-piper-es_ES-sharvard-medium",
+      "model": "es_ES-sharvard-medium.onnx",
+      "speaker": 1,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-es_ES-sharvard-medium.tar.bz2",
+      "bytes": 80318184,
+      "sha256": "b30a7a83df0518f0ee1c7039506648cade99f1f9b498fc49ed2ced2e2536bb5a",
+      "license": "Piper, datos Sharvard CC BY 3.0"
+    },
+    {
+      "id": "piper-claude-mx",
+      "name": "Claude (México)",
+      "engine": "piper",
+      "folder": "vits-piper-es_MX-claude-high",
+      "model": "es_MX-claude-high.onnx",
+      "speaker": 0,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-es_MX-claude-high.tar.bz2",
+      "bytes": 67207890,
+      "sha256": "ec33fb689c248fe64810aab564cba97babf0f506672cfd404928d46e751a4721",
+      "license": "Piper, Apache 2.0"
+    },
+    {
+      "id": "kokoro-dora",
+      "name": "Dora (mujer, Kokoro)",
+      "engine": "kokoro",
+      "folder": "kokoro-multi-lang-v1_0",
+      "model": "model.onnx",
+      "speaker": 28,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
+      "bytes": 349906910,
+      "sha256": "c5f7e2d2caf082bc1d20fb70334a61d99d20b484500aad32e7cf84c128ea3298",
+      "license": "Kokoro, Apache 2.0"
+    },
+    {
+      "id": "kokoro-alex",
+      "name": "Alex (hombre, Kokoro)",
+      "engine": "kokoro",
+      "folder": "kokoro-multi-lang-v1_0",
+      "model": "model.onnx",
+      "speaker": 29,
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
+      "bytes": 349906910,
+      "sha256": "c5f7e2d2caf082bc1d20fb70334a61d99d20b484500aad32e7cf84c128ea3298",
+      "license": "Kokoro, Apache 2.0"
+    }
+  ]
+}
