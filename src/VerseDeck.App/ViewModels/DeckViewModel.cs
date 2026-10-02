@@ -22,6 +22,9 @@ public sealed partial class ModuleTileViewModel : ObservableObject
     [ObservableProperty]
     private bool _justSent;
 
+    [ObservableProperty]
+    private string _warning = string.Empty;
+
     public ModuleTileViewModel(DeckButton button, string voiceSummary)
     {
         Id = button.Id;
@@ -54,13 +57,16 @@ public sealed partial class DeckViewModel : ObservableObject
     private readonly ButtonExecutor _executor;
     private readonly IStatusSink _status;
     private readonly IUiScheduler _ui;
+    private readonly ControlSync _controls;
     private long? _selectedId;
 
     [ObservableProperty]
     private bool _isEditMode;
 
-    public DeckViewModel(DeckSession session, ButtonExecutor executor, IStatusSink status, IUiScheduler ui)
+    public DeckViewModel(DeckSession session, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, ControlSync controls)
     {
+        _controls = controls;
+        _controls.Changed += (_, _) => ApplyWarnings();
         _session = session;
         _executor = executor;
         _status = status;
@@ -134,6 +140,16 @@ public sealed partial class DeckViewModel : ObservableObject
         }
 
         ApplySelection();
+        ApplyWarnings();
+    }
+
+    // A linked module whose game action has no usable key is flagged on its tile.
+    private void ApplyWarnings()
+    {
+        foreach (var tile in Tiles())
+        {
+            tile.Warning = BindStatusText.TileWarning(_controls.StatusOf(tile.Id));
+        }
     }
 
     private string VoiceSummaryFor(long buttonId)

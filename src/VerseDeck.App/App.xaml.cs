@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using VerseDeck.App.Services;
 using VerseDeck.App.ViewModels;
 using VerseDeck.Data;
+using VerseDeck.Game;
 using VerseDeck.Input;
 using VerseDeck.Voice;
 
@@ -41,6 +42,9 @@ public partial class App : Application
         var inputSender = new WindowsInputSender();
         var dialogs = new WpfDialogService();
         var audio = new AudioFeedback();
+        var ui = new DispatcherUiScheduler(Dispatcher);
+        var catalog = GameActionCatalog.Load();
+        var controlSync = new ControlSync(session, GameInstallLocator.ForThisMachine(), catalog, new FileWatch(), ui, log, () => DateTimeOffset.Now);
         var executor = new ButtonExecutor(inputSender, repository, dialogs, audio, log, () => session.Settings);
 
         return new ShellViewModel(new ShellServices(
@@ -50,12 +54,14 @@ public partial class App : Application
             dialogs,
             audio,
             log,
-            new DispatcherUiScheduler(Dispatcher),
+            ui,
             new WindowsSpeechCommandService(),
             new PttInputMonitor(),
             new MobileLink(repository, inputSender, log),
             new ThemeService(ApplyTheme),
-            () => OpenDebugConsole(log)));
+            () => OpenDebugConsole(log),
+            controlSync,
+            catalog));
     }
 
     private void ApplyTheme(ThemeId theme)

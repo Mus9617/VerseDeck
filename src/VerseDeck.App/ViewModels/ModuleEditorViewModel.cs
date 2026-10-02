@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VerseDeck.App.Services;
 using VerseDeck.Core.Models;
+using VerseDeck.Game;
 using VerseDeck.Input;
 
 namespace VerseDeck.App.ViewModels;
@@ -13,7 +14,14 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     private readonly DeckSession _session;
     private readonly IDialogService _dialogs;
     private readonly IStatusSink _status;
+    private readonly ControlSync _controls;
+    private readonly GameActionCatalog _catalog;
     private DeckButton? _button;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLinked))]
+    [NotifyPropertyChangedFor(nameof(IsManual))]
+    private GameActionChoice? _selectedGameAction;
 
     [ObservableProperty]
     private string _title = "Selecciona un modulo";
@@ -48,8 +56,10 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _confidence = "0.40";
 
-    public ModuleEditorViewModel(DeckSession session, IDialogService dialogs, IStatusSink status)
+    public ModuleEditorViewModel(DeckSession session, IDialogService dialogs, IStatusSink status, ControlSync controls, GameActionCatalog catalog)
     {
+        _controls = controls;
+        _catalog = catalog;
         _session = session;
         _dialogs = dialogs;
         _status = status;
@@ -59,6 +69,11 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     public IReadOnlyList<string> Icons => ModuleStyle.Icons;
     public IReadOnlyList<string> Frames => ModuleStyle.Frames;
     public ObservableCollection<string> Phrases { get; } = [];
+    public ObservableCollection<GameActionChoice> GameActionChoices { get; } = [];
+
+    /// <summary>Linked modules take their key from the game, so the key fields are read-only.</summary>
+    public bool IsLinked => !string.IsNullOrEmpty(SelectedGameAction?.Id);
+    public bool IsManual => !IsLinked;
 
     /// <summary>Asks the deck to select a module, used after creating one.</summary>
     public Action<long>? RequestSelect { get; set; }
@@ -67,6 +82,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     {
         _button = button;
         Phrases.Clear();
+        LoadGameActionChoices(button?.GameAction ?? string.Empty);
         if (button is null)
         {
             Title = "Selecciona un modulo";
@@ -100,7 +116,9 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
-        if (!TryReadName(out var name) || !TryBuildAction(Key, _button.Action.PressDurationMs, out var action))
+        // A linked module keeps its current key until the sync writes the game's key.
+        var action = _button.Action;
+        if (!TryReadName(out var name) || (IsManual && !TryBuildAction(Key, ManualPressMs, out action)))
         {
             return;
         }
@@ -114,8 +132,10 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
                 Icon = OrDefault(Icon, _button.Icon),
                 AccentColor = ModuleStyle.AccentForFrame(OrDefault(Frame, ModuleStyle.FrameFor(_button))),
                 Action = action,
-                RequiresConfirmation = RequiresConfirmation
+                RequiresConfirmation = RequiresConfirmation,
+                GameAction = SelectedGameAction?.Id ?? string.Empty
             });
+            await _controls.Pending;
             _status.Info("Modulo guardado");
         });
     }
@@ -130,7 +150,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
-        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) ? "F13" : Key, 60, out var action))
+        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) || IsLinked ? "F13" : Key, ManualPressMs, out var action))
         {
             return;
         }
@@ -146,7 +166,9 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
                 OrDefault(Category, "Custom"),
                 action,
                 RequiresConfirmation,
-                true));
+                true,
+                SelectedGameAction?.Id ?? string.Empty));
+            await _controls.Pending;
             RequestSelect?.Invoke(created.Id);
             _status.Info($"Modulo creado: {created.Name}");
         });
@@ -189,6 +211,33 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             await _session.SaveVoicePhraseAsync(_button.Id, NewPhrase, confidence);
             _status.Info("Frase de voz guardada");
         });
+    }
+
+    private const int ManualPressMs = 60;
+
+    private void LoadGameActionChoices(string current)
+    {
+        GameActionChoices.Clear();
+        GameActionChoices.Add(new GameActionChoice(string.Empty, "(ninguna: tecla manual)"));
+        foreach (var action in _catalog.Actions.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase))
+        {
+            GameActionChoices.Add(new GameActionChoice(action.Id, action.Label));
+        }
+
+        // Actions the player rebound that the catalog does not know can still be linked by their file name.
+        var fileOnly = _controls.Rebinds
+            .Where(r => r.Input.Device == ScDevice.Keyboard && _catalog.FindByActionName(r.Action) is null)
+            .Select(r => $"{r.ActionMap}/{r.Action}")
+            .Append(current)
+            .Where(id => id.Contains('/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase);
+        foreach (var id in fileOnly)
+        {
+            GameActionChoices.Add(new GameActionChoice(id, id));
+        }
+
+        SelectedGameAction = GameActionChoices.FirstOrDefault(c => c.Id.Equals(current, StringComparison.OrdinalIgnoreCase)) ?? GameActionChoices[0];
     }
 
     private bool TryReadName(out string name)

@@ -3,6 +3,7 @@ using VerseDeck.App.Services;
 using VerseDeck.App.ViewModels;
 using VerseDeck.Core.Models;
 using VerseDeck.Data;
+using VerseDeck.Game;
 
 namespace VerseDeck.Tests;
 
@@ -175,16 +176,33 @@ public sealed class Harness : IAsyncDisposable
     public FakeMobileLink Mobile { get; } = new();
     public List<ThemeId> AppliedThemes { get; } = [];
     public int DebugConsoleOpens { get; private set; }
+    public FakeGameFolder? Game { get; private set; }
+    public FakeFileWatch Watch { get; } = new();
+    public ControlSync ControlSync { get; private set; } = null!;
     public DateTimeOffset Now { get; set; } = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
     public SqliteVerseDeckRepository Repository { get; private set; } = null!;
     public DeckSession Session { get; private set; } = null!;
     public ShellViewModel Shell { get; private set; } = null!;
 
-    public static async Task<Harness> CreateAsync(bool initialize = true)
+    public static async Task<Harness> CreateAsync(bool initialize = true, bool withGame = true)
     {
         var harness = new Harness();
+        var launcherLogs = Path.Combine(Path.GetTempPath(), $"versedeck-launcher-{Guid.NewGuid():N}");
+        if (withGame)
+        {
+            // The game folder is found the way it is on a real machine: through the launcher's log.
+            harness.Game = new FakeGameFolder();
+            Directory.CreateDirectory(launcherLogs);
+            File.WriteAllText(
+                Path.Combine(launcherLogs, "log.log"),
+                $"[Launcher::launch] Launching Star Citizen LIVE from ({harness.Game.Root.Replace(@"\", @"\\")})");
+        }
+
+        harness.LauncherLogs = launcherLogs;
         harness.Repository = await harness.Db.CreateAsync();
         harness.Session = new DeckSession(harness.Repository);
+        var catalog = GameActionCatalog.Load();
+        harness.ControlSync = new ControlSync(harness.Session, new GameInstallLocator(launcherLogs, []), catalog, harness.Watch, harness.Ui, harness.Log, () => harness.Now);
         var executor = new ButtonExecutor(harness.Sender, harness.Repository, harness.Dialogs, harness.Audio, harness.Log, () => harness.Session.Settings);
         harness.Shell = new ShellViewModel(new ShellServices(
             harness.Session,
@@ -199,6 +217,8 @@ public sealed class Harness : IAsyncDisposable
             harness.Mobile,
             new ThemeService(harness.AppliedThemes.Add),
             () => harness.DebugConsoleOpens++,
+            harness.ControlSync,
+            catalog,
             () => harness.Now));
         if (initialize)
         {
@@ -210,5 +230,16 @@ public sealed class Harness : IAsyncDisposable
 
     public ModuleTileViewModel Tile(string name) => Shell.Deck.Groups.SelectMany(g => g.Tiles).First(t => t.Name == name);
 
-    public async ValueTask DisposeAsync() => await Db.DisposeAsync();
+    private string LauncherLogs { get; set; } = string.Empty;
+
+    public async ValueTask DisposeAsync()
+    {
+        Game?.Dispose();
+        if (Directory.Exists(LauncherLogs))
+        {
+            Directory.Delete(LauncherLogs, recursive: true);
+        }
+
+        await Db.DisposeAsync();
+    }
 }

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using QRCoder;
 using VerseDeck.App.Services;
 using VerseDeck.Core.Models;
+using VerseDeck.Game;
 
 namespace VerseDeck.App.ViewModels;
 
@@ -175,6 +176,8 @@ public sealed record ShellServices(
     IMobileLink Mobile,
     ThemeService Themes,
     Action OpenDebugConsole,
+    ControlSync ControlSync,
+    GameActionCatalog Catalog,
     Func<DateTimeOffset>? Clock = null);
 
 public sealed partial class ShellViewModel : ObservableObject, IStatusSink
@@ -202,8 +205,9 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public ShellViewModel(ShellServices services)
     {
         _services = services;
-        Deck = new DeckViewModel(services.Session, services.Executor, this, services.Ui);
-        Editor = new ModuleEditorViewModel(services.Session, services.Dialogs, this);
+        Deck = new DeckViewModel(services.Session, services.Executor, this, services.Ui, services.ControlSync);
+        Editor = new ModuleEditorViewModel(services.Session, services.Dialogs, this, services.ControlSync, services.Catalog);
+        Controls = new ControlsViewModel(services.Session, services.ControlSync, services.Catalog, this);
         Profile = new ProfileViewModel(services.Session, this);
         Activity = new ActivityViewModel(services.Repository);
         Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now));
@@ -224,12 +228,14 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public VoiceViewModel Voice { get; }
     public MobileLinkViewModel Mobile { get; }
     public SettingsViewModel Settings { get; }
+    public ControlsViewModel Controls { get; }
 
     public async Task InitializeAsync()
     {
         try
         {
             await _services.Session.LoadAsync();
+            await _services.ControlSync.Pending;
             Voice.SyncFromSettings();
             if (_services.Session.Settings.WelcomeSoundEnabled)
             {
