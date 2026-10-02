@@ -1,0 +1,68 @@
+<UserControl x:Class="VerseDeck.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24" MaxWidth="860" HorizontalAlignment="Left">
+            <TextBlock Text="AJUSTES" Style="{StaticResource H1}"/>
+
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="PERFIL" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="260"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="320"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="NOMBRE" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding Profile.Name, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="NAVE" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox IsEditable="True" IsTextSearchEnabled="True" ItemsSource="{Binding Profile.ShipNames}"
+                                      Text="{Binding Profile.ShipName, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </Grid>
+                    <Button Content="GUARDAR PERFIL" Style="{StaticResource PrimaryButton}" Command="{Binding Profile.SaveCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="Un nombre nuevo crea un perfil copiando el deck actual. Un nombre existente actualiza su nave. Para cambiar de perfil usa el selector de la cabecera."/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="TEMA" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,8,0,0" ItemsSource="{Binding Settings.ThemeChoices}" SelectedItem="{Binding Settings.Theme}"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="Auto elige el tema segun el fabricante de la nave del perfil: Drake, Origin, Aegis o Anvil. El resto usa Neutral."/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="SONIDO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <CheckBox Content="Sonido de bienvenida al iniciar" IsChecked="{Binding Settings.WelcomeSound}" Margin="0,8,0,4"/>
+                    <CheckBox Content="Sonido al enviar un comando" IsChecked="{Binding Settings.CommandSound}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="DIAGNOSTICO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <Button Content="ABRIR CONSOLA DE DEBUG" Command="{Binding Settings.OpenDebugConsoleCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="LEGAL" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0"
+                               Text="VerseDeck Companion es una aplicacion fan no oficial. No esta afiliada a Cloud Imperium Games, Roberts Space Industries ni Star Citizen."/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
+                               Text="Cada boton, frase o toque ejecuta una sola pulsacion configurable. Sin macros, bucles, lectura de memoria, inyeccion, hooks ni interceptacion de red."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

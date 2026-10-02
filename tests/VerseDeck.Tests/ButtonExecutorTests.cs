@@ -9,15 +9,16 @@ public sealed class ButtonExecutorTests : IAsyncLifetime
     private readonly FakeInputSender _sender = new();
     private readonly FakeDialogService _dialogs = new();
     private readonly FakeAudio _audio = new();
+    private VerseDeck.Data.SqliteVerseDeckRepository _repository = null!;
     private DeckSession _session = null!;
     private ButtonExecutor _executor = null!;
 
     public async Task InitializeAsync()
     {
-        var repository = await _db.CreateAsync();
-        _session = new DeckSession(repository);
+        _repository = await _db.CreateAsync();
+        _session = new DeckSession(_repository);
         await _session.LoadAsync();
-        _executor = new ButtonExecutor(_sender, repository, _dialogs, _audio, new FakeLog(), () => _session.Settings);
+        _executor = new ButtonExecutor(_sender, _repository, _dialogs, _audio, new FakeLog(), () => _session.Settings);
     }
 
     public async Task DisposeAsync() => await _db.DisposeAsync();
@@ -36,7 +37,7 @@ public sealed class ButtonExecutorTests : IAsyncLifetime
         Assert.Equal("L", Assert.Single(_sender.Sent).Key);
         Assert.Equal(1, _audio.CommandPlays);
         Assert.Equal("Lights", raised?.Name);
-        var entry = (await _db.CreateAsync()).GetRecentCommandLogAsync(1).Result.Single();
+        var entry = (await _repository.GetRecentCommandLogAsync(1)).Single();
         Assert.Equal("Windows", entry.Source);
         Assert.Equal("Lights", entry.Command);
     }

@@ -1,0 +1,135 @@
+<UserControl x:Class="VerseDeck.App.Views.DeckView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:VerseDeck.App.Views">
+    <UserControl.Resources>
+        <!-- One module: a single key press. The stripe colour follows the module's accent. -->
+        <DataTemplate x:Key="ModuleTile">
+            <Button Width="224" Height="96" Margin="0,0,8,8" Padding="0"
+                    AutomationProperties.Name="{Binding Name}"
+                    Command="{Binding DataContext.Deck.PressCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}"
+                                BorderThickness="{DynamicResource Stroke}" CornerRadius="{DynamicResource Radius}">
+                            <Grid>
+                                <Border x:Name="Flash" Background="{DynamicResource Accent}" Opacity="0" CornerRadius="{DynamicResource Radius}"/>
+                                <Border x:Name="Stripe" Width="3" HorizontalAlignment="Left" Background="{DynamicResource Accent}"/>
+                                <Grid Margin="16,10,12,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource HeadingFont}" FontSize="18" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Text}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="44" LineHeight="20"/>
+                                    <Viewbox Grid.Column="1" Width="26" Height="26" VerticalAlignment="Top" Margin="8,2,0,0">
+                                        <Canvas Width="256" Height="256">
+                                            <Path Data="{Binding IconKey, Converter={StaticResource IconKeyToGeometry}}"
+                                                  Stroke="{DynamicResource TextMuted}" StrokeThickness="14"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <DockPanel Grid.Row="1" Grid.ColumnSpan="2" LastChildFill="True">
+                                        <Border Style="{StaticResource KeyCap}" DockPanel.Dock="Left">
+                                            <TextBlock Text="{Binding KeyText}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource Text}"/>
+                                        </Border>
+                                        <TextBlock DockPanel.Dock="Right" Text="CONFIRMA" FontFamily="{DynamicResource HeadingFont}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Warning}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                   Visibility="{Binding RequiresConfirmation, Converter={StaticResource BoolToVisibility}}"/>
+                                        <TextBlock Text="{Binding VoiceSummary}" FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding AccentKey}" Value="Danger">
+                                <Setter TargetName="Stripe" Property="Background" Value="{DynamicResource Danger}"/>
+                                <Setter TargetName="Flash" Property="Background" Value="{DynamicResource Danger}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding AccentKey}" Value="Positive">
+                                <Setter TargetName="Stripe" Property="Background" Value="{DynamicResource Positive}"/>
+                                <Setter TargetName="Flash" Property="Background" Value="{DynamicResource Positive}"/>
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceRaised}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource TextMuted}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Line}"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding JustSent}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Flash" Storyboard.TargetProperty="Opacity" From="0.4" To="0" Duration="0:0:0.4"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid Margin="24,16,16,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel>
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" Content="EDITAR" IsChecked="{Binding Deck.IsEditMode}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <StackPanel>
+                    <TextBlock Text="DECK" Style="{StaticResource H1}"/>
+                    <TextBlock Text="Cada modulo envia una sola pulsacion. Con EDITAR activo, el clic selecciona en vez de enviar." Style="{StaticResource Muted}"/>
+                </StackPanel>
+            </DockPanel>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                <ItemsControl ItemsSource="{Binding Deck.Groups}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Category, Converter={StaticResource Upper}}" Style="{StaticResource SectionHeader}"/>
+                                <ItemsControl ItemsSource="{Binding Tiles}" ItemTemplate="{StaticResource ModuleTile}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <views:ActivityPanel Grid.Row="2" Margin="0,12,8,0"/>
+        </Grid>
+
+        <Border Grid.Column="1" Width="328" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1,0,0,0"
+                Visibility="{Binding Deck.IsEditMode, Converter={StaticResource BoolToVisibility}}">
+            <views:ModuleEditorView/>
+        </Border>
+    </Grid>
+</UserControl>

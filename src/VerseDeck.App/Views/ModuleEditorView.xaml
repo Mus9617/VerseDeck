@@ -1,0 +1,66 @@
+<UserControl x:Class="VerseDeck.App.Views.ModuleEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20,16,20,20">
+            <TextBlock Text="MODULO" Style="{StaticResource SectionHeader}" Margin="0"/>
+            <TextBlock Text="{Binding Editor.Title}" Style="{StaticResource H1}" Foreground="{DynamicResource Accent}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+            <TextBlock Text="{Binding Editor.Meta}" Style="{StaticResource Muted}"/>
+
+            <TextBlock Text="NOMBRE" Style="{StaticResource FieldLabel}" Margin="0,16,0,4"/>
+            <TextBox Text="{Binding Editor.Name, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="CATEGORIA" Style="{StaticResource FieldLabel}"/>
+            <ComboBox IsEditable="True" ItemsSource="{Binding Editor.Categories}" Text="{Binding Editor.Category, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="ICONO" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox ItemsSource="{Binding Editor.Icons}" SelectedItem="{Binding Editor.Icon}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="COLOR" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox ItemsSource="{Binding Editor.Frames}" SelectedItem="{Binding Editor.Frame}"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="1.4*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="TECLA" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding Editor.Key, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="MODIFICADORES" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding Editor.Modifiers, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}" ToolTip="Ctrl, Shift, Alt separados por comas"/>
+                </StackPanel>
+            </Grid>
+
+            <CheckBox Content="Pedir confirmacion antes de enviar" IsChecked="{Binding Editor.RequiresConfirmation}" Margin="0,12,0,8"/>
+
+            <WrapPanel>
+                <Button Content="GUARDAR" Style="{StaticResource PrimaryButton}" Command="{Binding Editor.SaveCommand}"/>
+                <Button Content="CREAR NUEVO" Command="{Binding Editor.CreateCommand}" ToolTip="Crea otro modulo con los datos del formulario"/>
+                <Button Content="ELIMINAR" Style="{StaticResource DangerButton}" Command="{Binding Editor.DeleteCommand}"/>
+            </WrapPanel>
+
+            <Border Style="{StaticResource Divider}"/>
+
+            <TextBlock Text="FRASES DE VOZ" Style="{StaticResource SectionHeader}" Margin="0"/>
+            <ListBox ItemsSource="{Binding Editor.Phrases}" MaxHeight="150" Margin="0,8,0,0"/>
+            <TextBlock Text="NUEVA FRASE" Style="{StaticResource FieldLabel}"/>
+            <TextBox Text="{Binding Editor.NewPhrase, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="CONFIANZA MINIMA (0,10 - 0,98)" Style="{StaticResource FieldLabel}"/>
+            <TextBox Text="{Binding Editor.Confidence, UpdateSourceTrigger=PropertyChanged}" Width="90" HorizontalAlignment="Left" FontFamily="{DynamicResource MonoFont}"/>
+            <Button Content="ANADIR FRASE" Command="{Binding Editor.AddPhraseCommand}" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

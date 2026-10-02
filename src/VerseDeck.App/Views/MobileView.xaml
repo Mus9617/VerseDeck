@@ -1,0 +1,42 @@
+<UserControl x:Class="VerseDeck.App.Views.MobileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24" MaxWidth="860" HorizontalAlignment="Left">
+            <TextBlock Text="MOVIL" Style="{StaticResource H1}"/>
+            <TextBlock Text="Usa el telefono o la tablet como segundo panel dentro de tu red local." Style="{StaticResource Muted}"/>
+
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- The QR needs a white quiet zone in every theme to stay scannable. -->
+                    <Border Width="176" Height="176" Background="White" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="10" VerticalAlignment="Top">
+                        <Image Source="{Binding Mobile.QrPng, Converter={StaticResource BytesToImage}}" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    </Border>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="DIRECCION" Style="{StaticResource SectionHeader}" Margin="0"/>
+                        <TextBlock Text="{Binding Mobile.Url}" FontFamily="{DynamicResource MonoFont}" FontSize="16" Foreground="{DynamicResource Accent}" Margin="0,6,0,12" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Mobile.PinText}" Style="{StaticResource Body}"/>
+                        <TextBlock Text="{Binding Mobile.DevicesText}" Style="{StaticResource Muted}" Margin="0,4,0,12"/>
+                        <WrapPanel>
+                            <Button Content="ACTIVAR SERVIDOR" Style="{StaticResource PrimaryButton}" Command="{Binding Mobile.StartCommand}"/>
+                            <Button Content="DETENER" Command="{Binding Mobile.StopCommand}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="COMO CONECTAR" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0"
+                               Text="1. Activa el servidor.  2. Escanea el codigo con el telefono, conectado a la misma red.  3. Escribe el PIN de emparejamiento.  El panel solo acepta dispositivos de la red local y cada toque envia una sola pulsacion."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

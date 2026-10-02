@@ -65,6 +65,7 @@ public sealed partial class MobileLinkViewModel : ObservableObject
         Url = "Servidor detenido";
         QrPng = null;
         Refresh();
+        _status.Info("Servidor movil detenido");
     }
 
     public void Refresh()

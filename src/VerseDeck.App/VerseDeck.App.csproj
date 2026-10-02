@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\VerseDeck.Core\VerseDeck.Core.csproj" />
@@ -19,8 +19,6 @@
     <Content Include="..\..\ready.mp3" Link="ready.mp3" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\system.mp3" Link="system.mp3" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Fonts\*.ttf" />
-    <Content Include="Assets\Skin\**\*.*" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\VideoUi\**\*.*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

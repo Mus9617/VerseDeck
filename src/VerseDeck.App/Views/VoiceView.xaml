@@ -1,0 +1,76 @@
+<UserControl x:Class="VerseDeck.App.Views.VoiceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,16,24,24" MaxWidth="860" HorizontalAlignment="Left">
+            <TextBlock Text="VOZ" Style="{StaticResource H1}"/>
+            <TextBlock Text="Reconocimiento local de Windows. Cada frase reconocida envia la pulsacion de su modulo, nada mas." Style="{StaticResource Muted}"/>
+
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="ESTADO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Text="{Binding Voice.StatusText}" Style="{StaticResource H2}" Margin="0,6,0,10"/>
+                    <WrapPanel>
+                        <Button Content="ACTIVAR VOZ" Style="{StaticResource PrimaryButton}" Command="{Binding Voice.StartCommand}"/>
+                        <Button Content="DETENER" Command="{Binding Voice.StopCommand}"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="ACTIVACION" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="MODO" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox ItemsSource="{Binding Voice.Modes}" SelectedItem="{Binding Voice.Mode}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="DISPOSITIVO PTT" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox ItemsSource="{Binding Voice.Devices}" SelectedItem="{Binding Voice.PttDevice}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="TECLA O BOTON PTT" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding Voice.PttBinding, UpdateSourceTrigger=PropertyChanged}" FontFamily="{DynamicResource MonoFont}"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="CONFIANZA MINIMA GLOBAL (0,10 - 0,98)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding Voice.Confidence, UpdateSourceTrigger=PropertyChanged}" Width="90" HorizontalAlignment="Left" FontFamily="{DynamicResource MonoFont}"/>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button Command="{Binding Voice.DetectPttCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Setter Property="Content" Value="DETECTAR BOTON PTT"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Voice.IsDetecting}" Value="True">
+                                            <Setter Property="Content" Value="PULSA AHORA..."/>
+                                            <Setter Property="IsEnabled" Value="False"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        <Button Content="GUARDAR" Command="{Binding Voice.SaveSettingsCommand}"/>
+                    </WrapPanel>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,10,0,0"
+                               Text="PushToTalk: la voz solo escucha mientras mantienes el boton, y 2,5 segundos despues de soltarlo. ManualToggle: escucha siempre hasta que la detengas."/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="FRASES" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0"
+                               Text="Las frases se editan por modulo: en DECK activa EDITAR, selecciona un modulo y anade la frase en el panel derecho. Con la voz activa, las frases nuevas se cargan al momento."/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
