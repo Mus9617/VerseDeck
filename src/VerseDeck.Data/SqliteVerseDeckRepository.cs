@@ -92,6 +92,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         );
         """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await EnsureColumnAsync(connection, "Buttons", "GameAction", "TEXT NOT NULL DEFAULT ''", cancellationToken);
         await EnsureDefaultDeckAsync(connection, cancellationToken);
     }
 
@@ -117,7 +118,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             values.GetValueOrDefault("PushToTalkDevice", "Keyboard"),
             values.GetValueOrDefault("PushToTalkBinding", "F13"),
             bool.Parse(values.GetValueOrDefault("CommandSoundEnabled", "True")),
-            bool.Parse(values.GetValueOrDefault("WelcomeSoundEnabled", "True")));
+            bool.Parse(values.GetValueOrDefault("WelcomeSoundEnabled", "True")),
+            values.GetValueOrDefault("GameFolder", string.Empty));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -133,6 +135,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await UpsertSetting(connection, "PushToTalkBinding", settings.PushToTalkBinding, cancellationToken);
         await UpsertSetting(connection, "CommandSoundEnabled", settings.CommandSoundEnabled.ToString(), cancellationToken);
         await UpsertSetting(connection, "WelcomeSoundEnabled", settings.WelcomeSoundEnabled.ToString(), cancellationToken);
+        await UpsertSetting(connection, "GameFolder", settings.GameFolder, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Profile>> GetProfilesAsync(CancellationToken cancellationToken = default)
@@ -184,7 +187,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await using var connection = await OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
         command.CommandText = """
-        SELECT Id, ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics
+        SELECT Id, ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction
         FROM Buttons WHERE ProfileId=$profileId ORDER BY Name
         """;
         command.Parameters.AddWithValue("$profileId", profileId);
@@ -196,7 +199,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             results.Add(new DeckButton(
                 reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
                 reader.GetString(5), new KeyPressAction(reader.GetString(6), modifiers, reader.GetInt32(8)),
-                reader.GetInt32(9) == 1, reader.GetInt32(10) == 1));
+                reader.GetInt32(9) == 1, reader.GetInt32(10) == 1, reader.GetString(11)));
         }
 
         return results;
@@ -210,8 +213,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         if (button.Id == 0)
         {
             command.CommandText = """
-            INSERT INTO Buttons (ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics)
-            VALUES ($profileId, $name, $icon, $accent, $category, $key, $modifiers, $duration, $confirm, $haptics);
+            INSERT INTO Buttons (ProfileId, Name, Icon, AccentColor, Category, ActionKey, ActionModifiers, PressDurationMs, RequiresConfirmation, MobileHaptics, GameAction)
+            VALUES ($profileId, $name, $icon, $accent, $category, $key, $modifiers, $duration, $confirm, $haptics, $gameAction);
             SELECT last_insert_rowid();
             """;
         }
@@ -219,7 +222,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
             command.CommandText = """
             UPDATE Buttons SET ProfileId=$profileId, Name=$name, Icon=$icon, AccentColor=$accent, Category=$category,
-            ActionKey=$key, ActionModifiers=$modifiers, PressDurationMs=$duration, RequiresConfirmation=$confirm, MobileHaptics=$haptics
+            ActionKey=$key, ActionModifiers=$modifiers, PressDurationMs=$duration, RequiresConfirmation=$confirm, MobileHaptics=$haptics, GameAction=$gameAction
             WHERE Id=$id; SELECT $id;
             """;
             command.Parameters.AddWithValue("$id", button.Id);
@@ -235,6 +238,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         command.Parameters.AddWithValue("$duration", button.Action.PressDurationMs);
         command.Parameters.AddWithValue("$confirm", button.RequiresConfirmation ? 1 : 0);
         command.Parameters.AddWithValue("$haptics", button.MobileHaptics ? 1 : 0);
+        command.Parameters.AddWithValue("$gameAction", button.GameAction ?? string.Empty);
         var id = (long)(await command.ExecuteScalarAsync(cancellationToken) ?? button.Id);
         return button with { Id = id };
     }
@@ -329,6 +333,21 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         return connection;
+    }
+
+    // Columns added after the first release; CREATE TABLE IF NOT EXISTS does not alter an existing table.
+    private static async Task EnsureColumnAsync(SqliteConnection connection, string table, string column, string definition, CancellationToken cancellationToken)
+    {
+        var info = connection.CreateCommand();
+        info.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='{column}'";
+        if ((long)(await info.ExecuteScalarAsync(cancellationToken) ?? 0L) > 0)
+        {
+            return;
+        }
+
+        var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task UpsertSetting(SqliteConnection connection, string key, string value, CancellationToken cancellationToken)

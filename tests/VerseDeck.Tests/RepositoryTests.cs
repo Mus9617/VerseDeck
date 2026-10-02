@@ -148,4 +148,46 @@ public class RepositoryTests
         Assert.Equal(2000, new KeyPressAction("C", [], 2000).Validate().PressDurationMs);
         Assert.Throws<InvalidOperationException>(() => new KeyPressAction("C", [], 2001).Validate());
     }
+
+    [Fact]
+    public async Task GameAction_RoundTrips()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        var lights = (await ActiveButtonsAsync(repository)).First(b => b.Name == "Lights");
+
+        await repository.SaveButtonAsync(lights with { GameAction = "headlights" });
+
+        Assert.Equal("headlights", (await ActiveButtonsAsync(repository)).First(b => b.Name == "Lights").GameAction);
+        Assert.Equal("", (await ActiveButtonsAsync(repository)).First(b => b.Name == "Cargo").GameAction);
+    }
+
+    [Fact]
+    public async Task GameFolder_RoundTrips()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        Assert.Equal("", (await repository.GetSettingsAsync()).GameFolder);
+
+        await repository.SaveSettingsAsync((await repository.GetSettingsAsync()) with { GameFolder = @"D:\rsi\StarCitizen\LIVE" });
+
+        Assert.Equal(@"D:\rsi\StarCitizen\LIVE", (await repository.GetSettingsAsync()).GameFolder);
+    }
+
+    [Fact]
+    public async Task DatabaseWithoutGameActionColumn_IsUpgraded_KeepingButtonsAndPhrases()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        var phrases = (await repository.GetVoiceCommandsAsync()).Count;
+        await db.ExecuteAsync("ALTER TABLE Buttons DROP COLUMN GameAction");
+
+        await repository.InitializeAsync();
+        await repository.InitializeAsync();
+
+        var buttons = await ActiveButtonsAsync(repository);
+        Assert.Equal(16, buttons.Count);
+        Assert.All(buttons, b => Assert.Equal("", b.GameAction));
+        Assert.Equal(phrases, (await repository.GetVoiceCommandsAsync()).Count);
+    }
 }

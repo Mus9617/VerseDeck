@@ -91,6 +91,17 @@ public sealed class DeckSession
         return saved;
     }
 
+    /// <summary>Saves several modules and reloads once, so listeners see a single change.</summary>
+    public async Task SaveButtonsAsync(IEnumerable<DeckButton> buttons)
+    {
+        foreach (var button in buttons)
+        {
+            await _repository.SaveButtonAsync(button);
+        }
+
+        await ReloadAsync();
+    }
+
     public async Task DeleteButtonAsync(long buttonId)
     {
         await _repository.DeleteButtonAsync(buttonId);

@@ -16,7 +16,8 @@ public sealed record DeckButton(
     string Category,
     KeyPressAction Action,
     bool RequiresConfirmation,
-    bool MobileHaptics);
+    bool MobileHaptics,
+    string GameAction = "");
 
 public sealed record VoiceCommand(
     long Id,
@@ -48,7 +49,8 @@ public sealed record AppSettings(
     string PushToTalkDevice = "Keyboard",
     string PushToTalkBinding = "F13",
     bool CommandSoundEnabled = true,
-    bool WelcomeSoundEnabled = true);
+    bool WelcomeSoundEnabled = true,
+    string GameFolder = "");
 
 public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers, int PressDurationMs)
 {
