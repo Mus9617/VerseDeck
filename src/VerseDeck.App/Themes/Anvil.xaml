@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#12150F"/>
+    <SolidColorBrush x:Key="Surface" Color="#1B2017"/>
+    <SolidColorBrush x:Key="SurfaceRaised" Color="#252B1F"/>
+    <SolidColorBrush x:Key="Line" Color="#38402E"/>
+    <SolidColorBrush x:Key="Text" Color="#E6E8DC"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#969C85"/>
+    <SolidColorBrush x:Key="Accent" Color="#C9B27C"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#12150F"/>
+    <SolidColorBrush x:Key="Positive" Color="#9DB65A"/>
+    <SolidColorBrush x:Key="Danger" Color="#D9603F"/>
+    <SolidColorBrush x:Key="Warning" Color="#D9A441"/>
+    <CornerRadius x:Key="Radius">2</CornerRadius>
+    <Thickness x:Key="Stroke">1</Thickness>
+    <FontFamily x:Key="HeadingFont">/VerseDeck.App;component/Fonts/#Barlow Condensed</FontFamily>
+    <FontFamily x:Key="BodyFont">/VerseDeck.App;component/Fonts/#Barlow</FontFamily>
+    <FontFamily x:Key="MonoFont">/VerseDeck.App;component/Fonts/#JetBrains Mono</FontFamily>
+</ResourceDictionary>
