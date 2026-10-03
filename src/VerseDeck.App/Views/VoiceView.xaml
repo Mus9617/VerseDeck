@@ -71,6 +71,87 @@
                                Text="Las frases se editan por modulo: en DECK activa EDITAR, selecciona un modulo y anade la frase en el panel derecho. Con la voz activa, las frases nuevas se cargan al momento."/>
                 </StackPanel>
             </Border>
+
+            <!-- What the microphone heard -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="ULTIMO QUE HA OIDO" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="Las ultimas 20 frases que reconocio el microfono y que hizo VerseDeck con cada una. Si algo no se ejecuta, aqui ves por que."/>
+                    <ItemsControl ItemsSource="{Binding Voice.History}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,5">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="260"/>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Time}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource Body}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ConfidenceText}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="Outcome" Grid.Column="3" Text="{Binding OutcomeText}" FontSize="12" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding OutcomeKey}" Value="Positive">
+                                        <Setter TargetName="Outcome" Property="Foreground" Value="{DynamicResource Positive}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding OutcomeKey}" Value="Danger">
+                                        <Setter TargetName="Outcome" Property="Foreground" Value="{DynamicResource Danger}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Offline phrase check -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="REVISAR FRASES" Style="{StaticResource SectionHeader}" Margin="0"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,8"
+                               Text="La voz del copiloto dice cada frase del perfil y el reconocedor la escucha, sin microfono. Avisa de las que se confunden con otro modulo o no se entienden. Necesita una voz instalada en Copiloto y solo trabaja mientras lo pides."/>
+                    <WrapPanel>
+                        <Button Content="REVISAR TODAS" Style="{StaticResource PrimaryButton}" Command="{Binding Voice.CheckAllCommand}"/>
+                        <Button Content="CANCELAR" Command="{Binding Voice.CancelCheckCommand}"
+                                Visibility="{Binding Voice.IsChecking, Converter={StaticResource BoolToVisibility}}"/>
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Voice.CheckStatus}" Style="{StaticResource Body}" Margin="0,8,0,8"/>
+                    <ItemsControl ItemsSource="{Binding Voice.CheckResults}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,5">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="260"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Module}" Style="{StaticResource Body}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Phrase}" Style="{StaticResource Body}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="Verdict" Grid.Column="2" Text="{Binding Text}" FontSize="12" Foreground="{DynamicResource Positive}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Confused">
+                                        <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource Danger}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="NotUnderstood">
+                                        <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource Warning}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Unchecked">
+                                        <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource TextMuted}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

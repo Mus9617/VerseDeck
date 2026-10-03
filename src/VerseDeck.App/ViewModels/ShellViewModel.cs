@@ -327,13 +327,18 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         _ = Activity.RefreshAsync();
     }
 
-    // Presses from the phone are logged by the server, so the activity list is polled.
+    // Presses from the phone are logged by the server, so the activity list is polled, but only while the
+    // phone panel is on: clicks and voice already refresh it through events, and the game needs the CPU.
     private void ScheduleRefresh()
     {
         _refreshTimer = _services.Ui.After(RefreshInterval, async () =>
         {
-            await Activity.RefreshAsync();
-            Mobile.Refresh();
+            if (Mobile.State == LinkState.Online)
+            {
+                await Activity.RefreshAsync();
+                Mobile.Refresh();
+            }
+
             ScheduleRefresh();
         });
     }

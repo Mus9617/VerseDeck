@@ -59,6 +59,12 @@ public sealed partial class GameInstallLocator
         return standard is null ? null : Install(standard, "Ruta habitual");
     }
 
+    private (string Path, long Length, DateTime Written)? _lastLog;
+    private string? _lastLogFolder;
+
+    /// <summary>How many times the launcher log was actually read, for tests.</summary>
+    public int LauncherLogReads { get; private set; }
+
     private static GameInstall Install(string folder, string source)
     {
         return new GameInstall(folder, Path.Combine(folder, "user", "client", "0", "Profiles", "default", "actionmaps.xml"), source);
@@ -77,6 +83,14 @@ public sealed partial class GameInstallLocator
                 return null;
             }
 
+            // The launcher log grows to megabytes; it is only read again when it has changed.
+            var key = (log.FullName, log.Length, log.LastWriteTimeUtc);
+            if (_lastLog == key)
+            {
+                return _lastLogFolder;
+            }
+
+            LauncherLogReads++;
             using var stream = new FileStream(log.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
             string? folder = null;
@@ -90,6 +104,8 @@ public sealed partial class GameInstallLocator
                 }
             }
 
+            _lastLog = key;
+            _lastLogFolder = folder;
             return folder;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
