@@ -1,7 +1,13 @@
 # Sub-proyecto 3b — Reconocimiento de voz más fiable
 
 Fecha: 2026-10-03
-Estado: pendiente de revisión
+Estado: implementado en la rama `reconocimiento`.
+
+Comprobación de aceptación con el código de VerseDeck (motor de voz y
+`WindowsPhraseChecker` reales, tres voces): 237 de 249 comandos oídos
+exactamente como ellos mismos, 0 de 21 frases de conversación aceptadas, 12
+de 51 frases del copiloto aceptadas (las descarta la guarda de la fase 3a), y
+"self destruct" confundida con "shields off" en una de las tres voces.
 
 ## Cambio respecto a la hoja de ruta
 

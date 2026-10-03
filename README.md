@@ -54,6 +54,14 @@ Una voz neuronal que confirma tus ordenes. Se genera en tu PC con [sherpa-onnx](
 
 Licencias de lo que usa esta funcion: sherpa-onnx (Apache 2.0), ONNX Runtime (MIT) y SharpCompress (MIT). Los modelos de voz y los binarios de sherpa-onnx incluyen datos y codigo de eSpeak NG, que se publica bajo GPL 3.0; tenlo en cuenta si redistribuyes la aplicacion.
 
+## Reconocimiento de voz
+
+Usa el reconocedor de Windows en español, sin descargas. Junto a tus frases escucha tambien "habla libre": si lo que oye suena a conversacion, no ejecuta nada. En una prueba con voces sinteticas, ninguna de 21 frases de conversacion se tomo por un comando.
+
+- **Probar frase** (editor de modulo) y **Revisar todas** (seccion Voz): la voz del copiloto dice tus frases y el reconocedor las escucha sin microfono. Avisa de las que se confunden con otro modulo o no se entienden. Necesita una voz del copiloto instalada y solo trabaja mientras lo pides.
+- **Ultimo que ha oido** (seccion Voz): las 20 ultimas frases reconocidas y por que se ejecutaron o no.
+- Las frases en ingles se reconocen peor con el reconocedor español; si una da problemas, cambiala por una en español.
+
 ## Panel movil
 
 El servidor solo responde dentro de la red local. El telefono se empareja escribiendo el PIN que muestra la app; sin emparejar no puede listar ni pulsar modulos.
