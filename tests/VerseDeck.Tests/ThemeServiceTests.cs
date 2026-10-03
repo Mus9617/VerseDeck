@@ -12,7 +12,10 @@ public class ThemeServiceTests
     [InlineData("Origin 890 Jump", ThemeId.Origin)]
     [InlineData("Aegis Gladius", ThemeId.Aegis)]
     [InlineData("Anvil Carrack", ThemeId.Anvil)]
-    [InlineData("RSI Polaris", ThemeId.Neutral)]
+    [InlineData("RSI Polaris", ThemeId.RSI)]
+    [InlineData("Gatac Syulen", ThemeId.Gatac)]
+    [InlineData("MISC Freelancer", ThemeId.MISC)]
+    [InlineData("Argo MOLE", ThemeId.Neutral)]
     [InlineData("Drakestone", ThemeId.Neutral)]
     [InlineData("Drake,Origin X", ThemeId.Neutral)]
     [InlineData("2 Fast", ThemeId.Neutral)]
@@ -80,7 +83,7 @@ public class ThemeServiceTests
         var applied = new List<ThemeId>();
         var service = new ThemeService(applied.Add);
 
-        service.Update(ThemeService.Auto, "RSI Polaris");
+        service.Update(ThemeService.Auto, "Argo MOLE");
 
         Assert.Equal([ThemeId.Neutral], applied);
     }

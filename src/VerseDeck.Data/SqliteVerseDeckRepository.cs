@@ -151,7 +151,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             ParseVolume(values.GetValueOrDefault("CopilotVolume", "0.80")),
             bool.Parse(values.GetValueOrDefault("CopilotVoiceOnly", "False")),
             values.GetValueOrDefault("CopilotMutedCategories", string.Empty),
-            bool.Parse(values.GetValueOrDefault("CopilotGreeting", "False")));
+            bool.Parse(values.GetValueOrDefault("CopilotGreeting", "False")),
+            bool.Parse(values.GetValueOrDefault("Animations", "True")));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -175,6 +176,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await UpsertSetting(connection, "CopilotVoiceOnly", settings.CopilotVoiceOnly.ToString(), cancellationToken);
         await UpsertSetting(connection, "CopilotMutedCategories", settings.CopilotMutedCategories, cancellationToken);
         await UpsertSetting(connection, "CopilotGreeting", settings.CopilotGreeting.ToString(), cancellationToken);
+        await UpsertSetting(connection, "Animations", settings.Animations.ToString(), cancellationToken);
     }
 
     public async Task<IReadOnlyList<Profile>> GetProfilesAsync(CancellationToken cancellationToken = default)
@@ -424,6 +426,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{DefaultDeckSeededKey}'";
         if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
+            await SeedAtcOnceAsync(connection, repo, cancellationToken);
             await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
             return;
         }
@@ -433,25 +436,13 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
             foreach (var preset in DefaultButtonPresets)
             {
-                var button = await repo.SaveButtonAsync(new DeckButton(
-                    0,
-                    profile.Id,
-                    preset.Name,
-                    preset.Icon,
-                    preset.AccentColor,
-                    preset.Category,
-                    preset.Action,
-                    preset.RequiresConfirmation,
-                    true), cancellationToken);
-
-                foreach (var phrase in preset.Phrases)
-                {
-                    await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
-                }
+                await SavePresetAsync(repo, profile.Id, preset, cancellationToken);
             }
         }
 
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
+        // The control tower modules first, so the example checklists can point at them.
+        await SeedAtcOnceAsync(connection, repo, cancellationToken);
         await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
     }
 
@@ -477,7 +468,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         [
             Step(1, "Preparar vuelo", "Flight Ready"),
             Step(2, "Luces", "Lights"),
-            Step(3, "Pedir permiso de despegue", null),
+            Step(3, "Pedir permiso de despegue", "Takeoff Request"),
             Step(4, "Despegar y subir el tren", "Landing Gear")
         ]), cancellationToken);
         }
@@ -486,7 +477,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
         await repo.SaveChecklistAsync(new Checklist(0, profileId, "Aterrizaje",
         [
-            Step(1, "Pedir permiso de aterrizaje", null),
+            Step(1, "Pedir permiso de aterrizaje", "Hangar Request"),
             Step(2, "Bajar el tren", "Landing Gear"),
             Step(3, "Apagar motores", "Engines Toggle")
         ]), cancellationToken);
@@ -681,6 +672,63 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         new("Eject", "eject", "#FF2E2E", "Emergency", new KeyPressAction("Y", ["Alt"], 60), false, ["eyectar", "eyeccion", "eject"]),
         new("Self Destruct", "warning", "#FF2E2E", "Emergency", new KeyPressAction("BACKSPACE", ["Alt"], 60), false, ["autodestruccion", "cancelar nave", "self destruct"])
     ];
+
+    // Both send the game's single landing/takeoff request; two modules so each phrase gets its own answer.
+    // Like every default module they start with a manual key and are linked to the game when the player asks.
+    private static readonly IReadOnlyList<DefaultButtonPreset> AtcPresets =
+    [
+        new("Hangar Request", "comms", "#7FD1FF", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
+            ["pedir hangar", "solicitar hangar", "pedir aterrizaje", "solicitar aterrizaje", "permiso para aterrizar", "request landing"]),
+        new("Takeoff Request", "comms", "#9BE564", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
+            ["pedir despegue", "solicitar despegue", "permiso para despegar", "pedir salida", "request takeoff"])
+    ];
+
+    private const string AtcSeededKey = "AtcModulesV1";
+
+    // A module the player already linked to the same request counts as present.
+    private static readonly Dictionary<string, string> AtcLinks = new() { ["Hangar Request"] = "atc_landing", ["Takeoff Request"] = "atc_takeoff" };
+
+    // Added once to every profile, new or old; a player who deletes them does not get them back.
+    private static async Task SeedAtcOnceAsync(SqliteConnection connection, SqliteVerseDeckRepository repo, CancellationToken cancellationToken)
+    {
+        var seeded = connection.CreateCommand();
+        seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{AtcSeededKey}'";
+        if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
+        {
+            return;
+        }
+
+        foreach (var profile in await repo.GetProfilesAsync(cancellationToken))
+        {
+            var buttons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
+            foreach (var preset in AtcPresets.Where(p => !buttons.Any(b =>
+                b.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase) || b.GameAction == AtcLinks[p.Name])))
+            {
+                await SavePresetAsync(repo, profile.Id, preset, cancellationToken);
+            }
+        }
+
+        await UpsertSetting(connection, AtcSeededKey, "Done", cancellationToken);
+    }
+
+    private static async Task SavePresetAsync(SqliteVerseDeckRepository repo, long profileId, DefaultButtonPreset preset, CancellationToken cancellationToken)
+    {
+        var button = await repo.SaveButtonAsync(new DeckButton(
+            0,
+            profileId,
+            preset.Name,
+            preset.Icon,
+            preset.AccentColor,
+            preset.Category,
+            preset.Action,
+            preset.RequiresConfirmation,
+            true), cancellationToken);
+
+        foreach (var phrase in preset.Phrases)
+        {
+            await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
+        }
+    }
 
     private sealed record DefaultButtonPreset(
         string Name,

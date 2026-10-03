@@ -1,0 +1,21 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Esperia: rojo Vanduul sobre negro -->
+    <SolidColorBrush x:Key="Bg" Color="#120A0A"/>
+    <SolidColorBrush x:Key="Surface" Color="#1B1010"/>
+    <SolidColorBrush x:Key="SurfaceRaised" Color="#251616"/>
+    <SolidColorBrush x:Key="Line" Color="#462626"/>
+    <SolidColorBrush x:Key="Text" Color="#F5E6E3"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#BE9C96"/>
+    <SolidColorBrush x:Key="Accent" Color="#E5483B"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#120A0A"/>
+    <SolidColorBrush x:Key="Positive" Color="#6FCF97"/>
+    <SolidColorBrush x:Key="Danger" Color="#FF7A6E"/>
+    <SolidColorBrush x:Key="Warning" Color="#F2B04C"/>
+    <SolidColorBrush x:Key="Glow" Color="#FF4433"/>
+    <CornerRadius x:Key="Radius">0</CornerRadius>
+    <Thickness x:Key="Stroke">1</Thickness>
+    <FontFamily x:Key="HeadingFont">/VerseDeck.App;component/Fonts/#Barlow Condensed</FontFamily>
+    <FontFamily x:Key="BodyFont">/VerseDeck.App;component/Fonts/#Barlow</FontFamily>
+    <FontFamily x:Key="MonoFont">/VerseDeck.App;component/Fonts/#JetBrains Mono</FontFamily>
+</ResourceDictionary>

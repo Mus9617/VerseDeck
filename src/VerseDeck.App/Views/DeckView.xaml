@@ -15,6 +15,7 @@
                                 BorderThickness="{DynamicResource Stroke}" CornerRadius="{DynamicResource Radius}">
                             <Grid>
                                 <Border x:Name="Flash" Background="{DynamicResource Accent}" Opacity="0" CornerRadius="{DynamicResource Radius}"/>
+                                <Border x:Name="Ring" BorderBrush="{DynamicResource Glow}" BorderThickness="2" Opacity="0" CornerRadius="{DynamicResource Radius}" IsHitTestVisible="False"/>
                                 <Border x:Name="Stripe" Width="3" HorizontalAlignment="Left" Background="{DynamicResource Accent}"/>
                                 <Grid Margin="16,10,12,10">
                                     <Grid.ColumnDefinitions>
@@ -82,6 +83,20 @@
                                     </BeginStoryboard>
                                 </DataTrigger.EnterActions>
                             </DataTrigger>
+                            <!-- The neon ring only while the window is in front: with the game in front nobody sees it. -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding JustSent}" Value="True"/>
+                                    <Condition Binding="{Binding DataContext.AnimationsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <MultiDataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Ring" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.6"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </MultiDataTrigger.EnterActions>
+                            </MultiDataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Button.Template>

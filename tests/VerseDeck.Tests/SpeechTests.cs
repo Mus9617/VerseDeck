@@ -212,7 +212,7 @@ public class ResponsePackTests
     {
         var expected = Sobria.Actions.Keys.OrderBy(k => k).ToList();
 
-        Assert.Equal(29, expected.Count);
+        Assert.Equal(31, expected.Count);
         Assert.All(Packs, p => Assert.Equal(expected, p.Actions.Keys.OrderBy(k => k)));
     }
 

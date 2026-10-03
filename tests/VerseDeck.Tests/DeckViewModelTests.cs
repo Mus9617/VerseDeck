@@ -12,7 +12,7 @@ public class DeckViewModelTests
         Assert.Equal(
             ["Flight", "Navigation", "Scan", "Combat", "Utility", "Emergency", "Systems"],
             h.Shell.Deck.Groups.Select(g => g.Category));
-        Assert.Equal(16, h.Shell.Deck.Groups.Sum(g => g.Tiles.Count));
+        Assert.Equal(18, h.Shell.Deck.Groups.Sum(g => g.Tiles.Count));
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class ModuleEditorViewModelTests
 
         await h.Shell.Editor.CreateCommand.ExecuteAsync(null);
 
-        Assert.Equal(17, h.Session.Buttons.Count);
+        Assert.Equal(19, h.Session.Buttons.Count);
         Assert.Equal("F13", h.Session.Buttons.First(b => b.Name == "Minar").Action.Key);
         Assert.Contains(h.Session.Buttons, b => b.Name == "Lights");
         Assert.True(h.Tile("Minar").IsSelected);

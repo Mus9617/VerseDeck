@@ -35,7 +35,9 @@
                     <TextBlock Text="TEMA" Style="{StaticResource SectionHeader}" Margin="0"/>
                     <ComboBox Width="260" HorizontalAlignment="Left" Margin="0,8,0,0" ItemsSource="{Binding Settings.ThemeChoices}" SelectedItem="{Binding Settings.Theme}"/>
                     <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0"
-                               Text="Auto elige el tema segun el fabricante de la nave del perfil: Drake, Origin, Aegis o Anvil. El resto usa Neutral."/>
+                               Text="Auto elige el tema segun el fabricante de la nave del perfil: Drake, Origin, Aegis, Anvil, Gatac, RSI, MISC, Crusader, Esperia o Banu. El resto usa Neutral."/>
+                    <CheckBox Content="Animaciones (neon que respira)" IsChecked="{Binding Settings.Animations}" Margin="0,10,0,0"
+                              ToolTip="Se paran solas mientras juegas: con la ventana minimizada o sin foco no gastan nada"/>
                 </StackPanel>
             </Border>
 

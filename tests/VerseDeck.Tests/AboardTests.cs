@@ -31,7 +31,7 @@ public class ChecklistPersistenceTests
 
         var linked = preflight.Steps.Where(s => s.ButtonId is not null).Select(s => h.Session.Buttons.Single(b => b.Id == s.ButtonId).Name);
         Assert.Contains("Lights", linked);
-        Assert.Contains(preflight.Steps, s => s.ButtonId is null);
+        Assert.Contains("Takeoff Request", linked);
         Assert.Equal(Enumerable.Range(1, preflight.Steps.Count), preflight.Steps.Select(s => s.Position));
     }
 

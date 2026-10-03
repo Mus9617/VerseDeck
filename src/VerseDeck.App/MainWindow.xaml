@@ -74,11 +74,66 @@
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                     <CheckBox Style="{StaticResource Switch}" Content="SILENCIO" IsChecked="{Binding IsMuted}" Margin="4,0,4,0"
                               ToolTip="Calla al copiloto al instante, sin cambiar sus ajustes"/>
-                    <ContentControl Style="{StaticResource LinkChip}" Tag="VOZ" Content="{Binding Voice.State}"/>
+                    <Grid>
+                        <ContentControl Style="{StaticResource LinkChip}" Tag="VOZ" Content="{Binding Voice.State}"/>
+                        <!-- Blinks once whenever the microphone recognises something, executed or not. -->
+                        <Border BorderBrush="{DynamicResource Glow}" BorderThickness="2" CornerRadius="{DynamicResource Radius}" Margin="4,0" IsHitTestVisible="False" Opacity="0">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Voice.JustHeard}" Value="True"/>
+                                                <Condition Binding="{Binding AnimationsActive}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <MultiDataTrigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.6"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </MultiDataTrigger.EnterActions>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+                    </Grid>
                     <ContentControl Style="{StaticResource LinkChip}" Tag="LAN" Content="{Binding Mobile.State}"/>
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Neon strip under the header, fading at both ends; it breathes with the rail marker. -->
+        <Rectangle Grid.Row="0" Height="2" VerticalAlignment="Bottom" Fill="{DynamicResource Glow}" IsHitTestVisible="False">
+            <Rectangle.OpacityMask>
+                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                    <GradientStop Color="#00000000" Offset="0"/>
+                    <GradientStop Color="#FF000000" Offset="0.25"/>
+                    <GradientStop Color="#FF000000" Offset="0.75"/>
+                    <GradientStop Color="#00000000" Offset="1"/>
+                </LinearGradientBrush>
+            </Rectangle.OpacityMask>
+            <Rectangle.Style>
+                <Style TargetType="Rectangle">
+                    <Setter Property="Opacity" Value="0.35"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding AnimationsActive}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard x:Name="StripBreathe">
+                                    <Storyboard Timeline.DesiredFrameRate="20">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.2" To="0.9" Duration="0:0:2.4" AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="StripBreathe"/>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Rectangle.Style>
+        </Rectangle>
 
         <!-- Rail + section -->
         <Grid Grid.Row="1">

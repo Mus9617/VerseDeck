@@ -14,5 +14,7 @@
   "Cargo": "cargo",
   "Comms": "comms",
   "Eject": "eject",
-  "Self Destruct": "self_destruct"
+  "Self Destruct": "self_destruct",
+  "Hangar Request": "atc_landing",
+  "Takeoff Request": "atc_takeoff"
 }

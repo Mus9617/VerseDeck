@@ -16,6 +16,8 @@
     "landing_gear": ["Tren, recibido.", "Afirmativo, tren."],
     "autoland": ["Aterrizaje automático, recibido."],
     "request_landing": ["Solicitando pista.", "Permiso solicitado."],
+    "atc_landing": ["Control, aquí {nave}, solicitando hangar. Petición transmitida.", "Torre, {nave} en aproximación. Solicitamos pista y esperamos asignación."],
+    "atc_takeoff": ["Control, aquí {nave}, solicitando salida. Petición transmitida.", "Torre, {nave} lista para despegar. Esperamos autorización."],
     "headlights": ["Luces, recibido.", "Afirmativo, luces."],
     "doors_toggle": ["Puertas, recibido."],
     "doorlocks_toggle": ["Cierres, recibido."],

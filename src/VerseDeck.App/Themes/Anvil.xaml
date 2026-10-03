@@ -11,6 +11,7 @@
     <SolidColorBrush x:Key="Positive" Color="#9DB65A"/>
     <SolidColorBrush x:Key="Danger" Color="#D9603F"/>
     <SolidColorBrush x:Key="Warning" Color="#D9A441"/>
+    <SolidColorBrush x:Key="Glow" Color="#C9B27C"/>
     <CornerRadius x:Key="Radius">2</CornerRadius>
     <Thickness x:Key="Stroke">1</Thickness>
     <FontFamily x:Key="HeadingFont">/VerseDeck.App;component/Fonts/#Barlow Condensed</FontFamily>

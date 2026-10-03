@@ -1,0 +1,21 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- MISC: industrial, verde azulado -->
+    <SolidColorBrush x:Key="Bg" Color="#0C1211"/>
+    <SolidColorBrush x:Key="Surface" Color="#141C1B"/>
+    <SolidColorBrush x:Key="SurfaceRaised" Color="#1C2725"/>
+    <SolidColorBrush x:Key="Line" Color="#2F403C"/>
+    <SolidColorBrush x:Key="Text" Color="#E4EFEC"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#93AAA4"/>
+    <SolidColorBrush x:Key="Accent" Color="#3CC9A7"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#06120F"/>
+    <SolidColorBrush x:Key="Positive" Color="#7AD36B"/>
+    <SolidColorBrush x:Key="Danger" Color="#EE6B57"/>
+    <SolidColorBrush x:Key="Warning" Color="#E8B04C"/>
+    <SolidColorBrush x:Key="Glow" Color="#3CC9A7"/>
+    <CornerRadius x:Key="Radius">4</CornerRadius>
+    <Thickness x:Key="Stroke">1</Thickness>
+    <FontFamily x:Key="HeadingFont">/VerseDeck.App;component/Fonts/#Barlow Condensed</FontFamily>
+    <FontFamily x:Key="BodyFont">/VerseDeck.App;component/Fonts/#Barlow</FontFamily>
+    <FontFamily x:Key="MonoFont">/VerseDeck.App;component/Fonts/#JetBrains Mono</FontFamily>
+</ResourceDictionary>

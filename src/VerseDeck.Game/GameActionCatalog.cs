@@ -3,11 +3,13 @@ using VerseDeck.Core.Models;
 
 namespace VerseDeck.Game;
 
-public sealed record GameAction(string Id, string Label, string ActionMap, IReadOnlyList<string> ActionNames, string? DefaultInput, int PressMs);
+public sealed record GameAction(string Id, string Label, string ActionMap, IReadOnlyList<string> ActionNames, string? DefaultInput, int PressMs, string Group = "General");
 
 /// <summary>
 /// VerseDeck's own table of game actions and their default keyboard keys. The game does not publish its
-/// defaults in any readable file, so this is maintained by hand for one game version.
+/// defaults in any readable file, so this is maintained by hand for one game version. Keys come from two
+/// public 4.10 guides that agree; where they disagree the action has no default. Some internal names are
+/// best effort: a wrong one only means a rebind of that action is not noticed, and the default key is used.
 /// </summary>
 public sealed class GameActionCatalog
 {
@@ -30,7 +32,7 @@ public sealed class GameActionCatalog
         var file = JsonSerializer.Deserialize<CatalogFile>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("game-actions.json is empty.");
         var actions = file.Actions
-            .Select(a => new GameAction(a.Id, a.Label, a.ActionMap, a.Actions, a.Default, a.PressMs))
+            .Select(a => new GameAction(a.Id, a.Label, a.ActionMap, a.Actions, a.Default, a.PressMs, string.IsNullOrWhiteSpace(a.Group) ? "General" : a.Group))
             .ToList();
         return new GameActionCatalog(file.GameVersion, actions, new Dictionary<string, string>(file.PresetLinks, StringComparer.OrdinalIgnoreCase));
     }
@@ -53,7 +55,7 @@ public sealed class GameActionCatalog
 
     private sealed record CatalogFile(string GameVersion, List<CatalogAction> Actions, Dictionary<string, string> PresetLinks);
 
-    private sealed record CatalogAction(string Id, string Label, string ActionMap, List<string> Actions, string? Default, int PressMs);
+    private sealed record CatalogAction(string Id, string Label, string ActionMap, List<string> Actions, string? Default, int PressMs, string? Group);
 }
 
 public enum BindStatus { YourKey, Default, NoKey, NotSendable, Conflict }

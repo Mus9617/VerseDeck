@@ -19,7 +19,7 @@ public class RepositoryTests
         var repository = await db.CreateAsync();
         await repository.InitializeAsync();
 
-        Assert.Equal(16, (await ActiveButtonsAsync(repository)).Count);
+        Assert.Equal(18, (await ActiveButtonsAsync(repository)).Count);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class RepositoryTests
         await repository.InitializeAsync();
 
         var buttons = await ActiveButtonsAsync(repository);
-        Assert.Equal(16, buttons.Count);
+        Assert.Equal(18, buttons.Count);
         Assert.DoesNotContain(buttons, b => b.Name == "Lights");
     }
 
@@ -61,7 +61,8 @@ public class RepositoryTests
 
         await repository.InitializeAsync();
 
-        Assert.Equal(15, (await ActiveButtonsAsync(repository)).Count);
+        // The default deck is not added to an old one; only the two control tower modules are.
+        Assert.Equal(17,(await ActiveButtonsAsync(repository)).Count);
         Assert.Equal("Done", await db.ScalarAsync("SELECT Value FROM Settings WHERE Key='DefaultDeckSeededV1'"));
     }
 
@@ -186,7 +187,7 @@ public class RepositoryTests
         await repository.InitializeAsync();
 
         var buttons = await ActiveButtonsAsync(repository);
-        Assert.Equal(16, buttons.Count);
+        Assert.Equal(18, buttons.Count);
         Assert.All(buttons, b => Assert.Equal("", b.GameAction));
         Assert.Equal(phrases, (await repository.GetVoiceCommandsAsync()).Count);
     }
@@ -263,7 +264,7 @@ public class RepositoryTests
         await repository.InitializeAsync();
 
         var buttons = await ActiveButtonsAsync(repository);
-        Assert.Equal(16, buttons.Count);
+        Assert.Equal(18, buttons.Count);
         Assert.All(buttons, b => Assert.Equal("", b.Response));
     }
 }

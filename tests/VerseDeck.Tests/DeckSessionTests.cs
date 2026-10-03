@@ -18,7 +18,7 @@ public class DeckSessionTests
         var session = await LoadedSessionAsync(db);
 
         Assert.Equal("Global", session.ActiveProfile!.Name);
-        Assert.Equal(16, session.Buttons.Count);
+        Assert.Equal(18, session.Buttons.Count);
         Assert.Single(session.Profiles);
     }
 
@@ -34,7 +34,7 @@ public class DeckSessionTests
 
         Assert.NotEqual(sourceId, created.Id);
         Assert.Equal(created.Id, session.ActiveProfile!.Id);
-        Assert.Equal(16, session.Buttons.Count);
+        Assert.Equal(18, session.Buttons.Count);
         Assert.All(session.Buttons, b => Assert.Equal(created.Id, b.ProfileId));
         Assert.Equal(sourcePhrases, session.VoiceCommands.Count);
     }
@@ -49,7 +49,7 @@ public class DeckSessionTests
 
         Assert.Single(session.Profiles);
         Assert.Equal("Drake Cutlass Black", session.ActiveProfile!.ShipName);
-        Assert.Equal(16, session.Buttons.Count);
+        Assert.Equal(18, session.Buttons.Count);
     }
 
     [Fact]
