@@ -28,7 +28,11 @@ dotnet run --project src/VerseDeck.App/VerseDeck.App.csproj
 
 ## Temas
 
-El tema cambia solo segun el fabricante de la nave del perfil activo: **Drake**, **Origin**, **Aegis** y **Anvil**. Cualquier otra nave usa **Neutral**. En Ajustes se puede fijar un tema concreto.
+El tema cambia solo segun el fabricante de la nave del perfil activo: **Drake**, **Origin**, **Aegis**, **Anvil**, **Gatac** (violeta Xi'an, como la Syulen), **RSI**, **MISC**, **Crusader**, **Esperia** y **Banu**. Cualquier otra nave usa **Neutral**. En Ajustes se puede fijar un tema concreto.
+
+- La lista de naves del perfil trae 187 naves pilotables agrupadas por fabricante; el campo sigue siendo editable.
+- **Animaciones**: un neon que respira junto a la seccion activa y bajo la cabecera. Va a 20 fotogramas por segundo y se para del todo con la ventana minimizada o sin foco, es decir, mientras juegas. Medido: menos del 2 % de un nucleo con la ventana delante, 0 con el juego delante. Se apaga en Ajustes.
+- Destellos que solo cuestan cuando pasa algo: un anillo de neon en el modulo que se acaba de enviar y un parpadeo del indicador VOZ cada vez que el microfono reconoce una frase.
 
 ## Controles
 
@@ -39,6 +43,11 @@ VerseDeck lee `actionmaps.xml` de tu perfil de Star Citizen y usa tu tecla en lo
 - Los nombres internos de las acciones del catalogo vienen de documentacion comunitaria y no estan verificados contra el juego. Si un modulo vinculado ignora tu rebind, vinculalo a la accion tal como aparece en "Tus rebinds".
 - Las acciones que piden mantener la tecla (autodestruccion, modo maestro, aterrizaje automatico) se envian como una sola pulsacion larga, de 2 segundos como maximo.
 - No se envian botones de raton, mando o joystick ni dobles pulsaciones.
+- El catalogo tiene 56 acciones agrupadas (Vuelo, Aterrizaje, Energia, Sistemas, Operador, Objetivos, Defensa, Interfaz, A pie). Las teclas por defecto se han cruzado entre dos guias publicas de 4.10; cuando no coinciden, la accion queda sin tecla por defecto en vez de arriesgar una pulsacion equivocada. No se leen los archivos internos del juego para no rozar el EULA.
+
+### Control de trafico
+
+Dos modulos, **Hangar Request** ("pedir hangar", "solicitar aterrizaje") y **Takeoff Request** ("pedir despegue", "pedir salida"), envian la unica tecla de permiso del juego (LAlt+N por defecto, o la tuya al vincularlos). El copiloto contesta en papel de controlador y nombra tu nave ("Control, aqui Syulen, solicitando hangar"). Sin leer la memoria del juego no puede saber si te han asignado hangar o si se han abierto las puertas, asi que confirma que la peticion salio, nunca lo que paso dentro del juego.
 
 ## Copiloto
 
