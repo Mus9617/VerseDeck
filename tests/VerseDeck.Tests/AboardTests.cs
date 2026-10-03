@@ -442,3 +442,86 @@ public class AboardViewModelTests
         Assert.Equal("Combate", aboard.SelectedChecklist?.Name);
     }
 }
+
+public class AboardSpeechTests
+{
+    [Fact]
+    public async Task WarmUp_RendersChecklistAndTimerPhrases_Ahead()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        await h.Copilot.WarmUpAsync();
+
+        Assert.Contains("Paso 1 de 3: Pedir permiso de aterrizaje.", h.Tts.Synthesized);
+        Assert.Contains("Checklist Prevuelo completa.", h.Tts.Synthesized);
+        Assert.Contains("Temporizador, diez minutos.", h.Tts.Synthesized);
+        Assert.Contains("Temporizador: han pasado treinta minutos.", h.Tts.Synthesized);
+        Assert.Contains("Anotado.", h.Tts.Synthesized);
+    }
+
+    [Fact]
+    public async Task SavedChecklist_IsRenderedWhileEditing()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        var aboard = h.Shell.Aboard;
+
+        aboard.NewChecklistCommand.Execute(null);
+        aboard.EditName = "Minado";
+        aboard.EditSteps[0].Text = "Abrir el escaner";
+        await aboard.SaveChecklistCommand.ExecuteAsync(null);
+        await aboard.Pending;
+
+        Assert.Contains("Paso 1 de 1: Abrir el escaner.", h.Tts.Synthesized);
+    }
+
+    [Fact]
+    public async Task SlowAnnouncement_IsStillSaid()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        h.Shell.Timers.Add("hangar", TimeSpan.FromMinutes(7));
+        var alert = "Hangar: han pasado siete minutos.";
+        h.Tts.Hold(alert);
+
+        h.Now += TimeSpan.FromMinutes(7);
+        h.Ui.Fire(TimeSpan.FromMinutes(7));
+        h.Now += TimeSpan.FromSeconds(5);
+        h.Tts.Release(alert);
+        await h.Copilot.Pending;
+        await Task.Delay(200);
+
+        Assert.Contains($"Copilot said '{alert}' (generated)", h.Log.Lines.Select(l => l.Trim()));
+    }
+
+    [Fact]
+    public async Task ModelLoadedOnTheFly_IsReleasedWhenIdle()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        h.Copilot.IdleUnload = TimeSpan.FromMilliseconds(20);
+        var before = h.Tts.Unloads;
+
+        await h.Copilot.SayAsync("Frase nunca dicha antes.");
+        await h.Copilot.IdleRelease;
+
+        Assert.Equal(before + 1, h.Tts.Unloads);
+    }
+
+    [Fact]
+    public async Task CachedPhrase_DoesNotScheduleARelease()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        await h.Copilot.SayAsync("Frase repetida.");
+        h.Copilot.IdleUnload = TimeSpan.FromMilliseconds(20);
+        await h.Copilot.IdleRelease;
+        var before = h.Tts.Unloads;
+        var release = h.Copilot.IdleRelease;
+
+        await h.Copilot.SayAsync("Frase repetida.");
+
+        Assert.Same(release, h.Copilot.IdleRelease);
+        Assert.Equal(before, h.Tts.Unloads);
+    }
+}

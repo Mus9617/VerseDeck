@@ -236,6 +236,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
             this,
             services.ExportFolder ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)));
         Voice.CompanionHandler = Aboard.HandleAsync;
+        services.Copilot.ExtraPhrases = () => Checklists.Phrases().Concat(TimerService.CommonPhrases()).Append(AboardViewModel.Noted);
         if (services.PhraseChecker is not null)
         {
             var doctor = new VoiceDoctor(services.Session, services.Copilot, services.PhraseChecker, services.Log);

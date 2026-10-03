@@ -125,7 +125,7 @@ public class ThemeResourceTests
         {
             var icons = Load("Icons");
             return ModuleStyle.Icons
-                .Concat(["nav.deck", "nav.controls", "nav.copilot", "nav.voice", "nav.mobile", "nav.settings"])
+                .Concat(["nav.deck", "nav.controls", "nav.copilot", "nav.aboard", "nav.voice", "nav.mobile", "nav.settings"])
                 .Where(key => icons[$"Icon.{key}"] is not Geometry)
                 .ToList();
         });

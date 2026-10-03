@@ -34,6 +34,25 @@ public sealed class ChecklistRunner
 
     public event EventHandler? Changed;
 
+    /// <summary>Everything the runner can say for the profile's checklists, so the warm-up can render it ahead.</summary>
+    public IEnumerable<string> Phrases()
+    {
+        foreach (var checklist in _session.Checklists)
+        {
+            for (var i = 0; i < checklist.Steps.Count; i++)
+            {
+                yield return StepPhrase(checklist, i);
+            }
+
+            yield return Finished(checklist.Name);
+            yield return Cancelled(checklist.Name);
+        }
+    }
+
+    private static string StepPhrase(Checklist checklist, int index) => $"Paso {index + 1} de {checklist.Steps.Count}: {checklist.Steps[index].Text}.";
+    private static string Finished(string name) => $"Checklist {name} completa.";
+    private static string Cancelled(string name) => $"Checklist {name} cancelada.";
+
     public bool Start(string name)
     {
         var wanted = SpeechText.Normalize(name);
@@ -106,7 +125,7 @@ public sealed class ChecklistRunner
         Active = null;
         Index = 0;
         StatusText = $"Checklist {name} cancelada";
-        Say($"Checklist {name} cancelada.");
+        Say(Cancelled(name));
         Changed?.Invoke(this, EventArgs.Empty);
         return true;
     }
@@ -133,7 +152,7 @@ public sealed class ChecklistRunner
             Active = null;
             Index = 0;
             StatusText = $"Checklist {name} completa";
-            Say($"Checklist {name} completa.");
+            Say(Finished(name));
             Changed?.Invoke(this, EventArgs.Empty);
             return;
         }
@@ -145,7 +164,7 @@ public sealed class ChecklistRunner
     {
         var step = Current!;
         StatusText = $"Paso {Index + 1} de {Active!.Steps.Count}: {step.Text}";
-        Say($"Paso {Index + 1} de {Active.Steps.Count}: {step.Text}.");
+        Say(StepPhrase(Active, Index));
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -153,7 +172,7 @@ public sealed class ChecklistRunner
     {
         if (_copilot.CanSpeak)
         {
-            Pending = _copilot.SayAsync(text);
+            Pending = _copilot.SayAsync(text, whenReady: true);
         }
     }
 
@@ -222,7 +241,24 @@ public sealed class TimerService
         _audio = audio;
     }
 
+    public const string AllCancelled = "Temporizadores cancelados.";
+
     public IReadOnlyList<TimerEntry> Timers => _timers;
+
+    /// <summary>What unnamed voice timers say, so the warm-up can render it ahead. Named ones are rendered when used.</summary>
+    public static IEnumerable<string> CommonPhrases()
+    {
+        yield return AllCancelled;
+        foreach (var minutes in CompanionGrammar.TimerAmounts)
+        {
+            var entry = new TimerEntry(0, null, TimeSpan.FromMinutes(minutes), default);
+            yield return Confirmation(entry);
+            yield return Alert(entry);
+        }
+    }
+
+    private static string Confirmation(TimerEntry entry) => $"{entry.Title}, {Describe(entry.Duration)}.";
+    private static string Alert(TimerEntry entry) => $"{entry.Title}: han pasado {Describe(entry.Duration)}.";
 
     /// <summary>True when a system timer is waiting; false means the service is doing nothing at all.</summary>
     public bool IsScheduled => _next is not null;
@@ -238,7 +274,7 @@ public sealed class TimerService
 
         var entry = new TimerEntry(_nextId++, label, duration, _clock() + duration);
         _timers.Add(entry);
-        Say($"{entry.Title}, {Describe(duration)}.");
+        Say(Confirmation(entry));
         Schedule();
         return entry;
     }
@@ -257,7 +293,7 @@ public sealed class TimerService
         }
 
         _timers.Clear();
-        Say("Temporizadores cancelados.");
+        Say(AllCancelled);
         Schedule();
     }
 
@@ -298,7 +334,7 @@ public sealed class TimerService
         foreach (var timer in _timers.Where(t => !t.Fired && t.Due <= now).ToList())
         {
             timer.Fired = true;
-            if (!Say($"{timer.Title}: han pasado {Describe(timer.Duration)}."))
+            if (!Say(Alert(timer)))
             {
                 _audio.PlayCommand();
             }
@@ -314,7 +350,7 @@ public sealed class TimerService
             return false;
         }
 
-        _ = _copilot.SayAsync(text);
+        _ = _copilot.SayAsync(text, whenReady: true);
         return true;
     }
 }

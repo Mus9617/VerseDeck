@@ -43,6 +43,8 @@ public sealed partial class TimerRow : ObservableObject
 /// <summary>Checklists, timers and logbook: the copilot's helpers that do not need the game.</summary>
 public sealed partial class AboardViewModel : ObservableObject
 {
+    public const string Noted = "Anotado.";
+
     private static readonly TimeSpan CountdownStep = TimeSpan.FromSeconds(1);
 
     private readonly DeckSession _session;
@@ -150,7 +152,7 @@ public sealed partial class AboardViewModel : ObservableObject
                 var note = await _logbook.AddAsync(text, "Voz");
                 if (note is not null && _copilot.CanSpeak)
                 {
-                    _ = _copilot.SayAsync("Anotado.");
+                    _ = _copilot.SayAsync(Noted, whenReady: true);
                 }
 
                 return note is not null;
@@ -234,6 +236,12 @@ public sealed partial class AboardViewModel : ObservableObject
             var saved = await _session.SaveChecklistAsync(new Checklist(SelectedChecklist?.Id ?? 0, _session.ActiveProfile?.Id ?? 0, EditName, steps));
             SelectedChecklist = Checklists.FirstOrDefault(c => c.Id == saved.Id);
             _status.Info($"Checklist guardada: {saved.Name}");
+
+            // New steps are rendered now, while editing, so nothing is generated mid-flight.
+            if (_copilot.CanSpeak)
+            {
+                Pending = _copilot.WarmUpAsync();
+            }
         }
         catch (InvalidOperationException ex)
         {
