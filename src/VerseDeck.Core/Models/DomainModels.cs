@@ -141,6 +141,17 @@ public interface IVoiceCommandService : IDisposable
     Task StopAsync(CancellationToken cancellationToken = default);
 }
 
+public enum CompanionKind { StartChecklist, Done, Skip, Repeat, CancelChecklist, Timer, CancelTimers, Note }
+
+/// <summary>A request to the copilot itself rather than to a module: checklists, timers and notes.</summary>
+public sealed record CompanionCommand(CompanionKind Kind, string? Name = null, TimeSpan? Duration = null, string? Label = null, string? Text = null);
+
+public sealed record ChecklistStep(long Id, int Position, string Text, long? ButtonId);
+
+public sealed record Checklist(long Id, long ProfileId, string Name, IReadOnlyList<ChecklistStep> Steps);
+
+public sealed record LogbookNote(long Id, DateTimeOffset CreatedAt, string ProfileName, string ShipName, string Text, string Source);
+
 /// <summary>What happened to something the microphone heard.</summary>
 public enum RecognitionOutcome { Executed, Discarded, LowConfidence, GateClosed, CopilotSpeaking, Repeated, ModuleGone, Offline, Failed }
 
