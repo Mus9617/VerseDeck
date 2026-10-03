@@ -15,6 +15,7 @@
                                 BorderThickness="{DynamicResource Stroke}" CornerRadius="{DynamicResource Radius}">
                             <Grid>
                                 <Border x:Name="Flash" Background="{DynamicResource Accent}" Opacity="0" CornerRadius="{DynamicResource Radius}"/>
+                                <Border x:Name="Ring" BorderBrush="{DynamicResource Glow}" BorderThickness="2" Opacity="0" CornerRadius="{DynamicResource Radius}" IsHitTestVisible="False"/>
                                 <Border x:Name="Stripe" Width="3" HorizontalAlignment="Left" Background="{DynamicResource Accent}"/>
                                 <Grid Margin="16,10,12,10">
                                     <Grid.ColumnDefinitions>
@@ -78,6 +79,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Flash" Storyboard.TargetProperty="Opacity" From="0.4" To="0" Duration="0:0:0.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="Ring" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.6"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </DataTrigger.EnterActions>

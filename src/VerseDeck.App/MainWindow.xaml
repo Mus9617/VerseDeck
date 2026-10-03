@@ -74,7 +74,27 @@
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                     <CheckBox Style="{StaticResource Switch}" Content="SILENCIO" IsChecked="{Binding IsMuted}" Margin="4,0,4,0"
                               ToolTip="Calla al copiloto al instante, sin cambiar sus ajustes"/>
-                    <ContentControl Style="{StaticResource LinkChip}" Tag="VOZ" Content="{Binding Voice.State}"/>
+                    <Grid>
+                        <ContentControl Style="{StaticResource LinkChip}" Tag="VOZ" Content="{Binding Voice.State}"/>
+                        <!-- Blinks once whenever the microphone recognises something, executed or not. -->
+                        <Border BorderBrush="{DynamicResource Glow}" BorderThickness="2" CornerRadius="{DynamicResource Radius}" Margin="4,0" IsHitTestVisible="False" Opacity="0">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Voice.JustHeard}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.6"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+                    </Grid>
                     <ContentControl Style="{StaticResource LinkChip}" Tag="LAN" Content="{Binding Mobile.State}"/>
                 </StackPanel>
             </Grid>

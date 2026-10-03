@@ -183,3 +183,19 @@ public class AnimationTests
         Assert.False(h.Session.Settings.Animations);
     }
 }
+
+public class HeardBlinkTests
+{
+    [Fact]
+    public async Task HeaderBlinks_WhenSomethingIsHeard_ThenSettles()
+    {
+        await using var h = await Harness.CreateAsync();
+        Assert.False(h.Shell.Voice.JustHeard);
+
+        h.Voice.RaiseHeard("vamos alla", RecognitionOutcome.Discarded);
+
+        Assert.True(h.Shell.Voice.JustHeard);
+        Assert.Equal(1, h.Ui.Fire(TimeSpan.FromMilliseconds(600)));
+        Assert.False(h.Shell.Voice.JustHeard);
+    }
+}

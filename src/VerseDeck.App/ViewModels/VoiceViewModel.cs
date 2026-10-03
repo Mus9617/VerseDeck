@@ -35,6 +35,10 @@ public sealed partial class VoiceViewModel : ObservableObject
     [ObservableProperty]
     private LinkState _state;
 
+    /// <summary>True for a moment after the microphone recognised something, so the header can blink.</summary>
+    [ObservableProperty]
+    private bool _justHeard;
+
     [ObservableProperty]
     private string _statusText = "Voz detenida";
 
@@ -155,7 +159,16 @@ public sealed partial class VoiceViewModel : ObservableObject
         {
             History.RemoveAt(History.Count - 1);
         }
+
+        // A one-shot blink: it costs a frame or two when something is heard, nothing in between.
+        JustHeard = false;
+        JustHeard = true;
+        _heardBlink?.Dispose();
+        _heardBlink = _ui.After(HeardBlink, () => JustHeard = false);
     }
+
+    private static readonly TimeSpan HeardBlink = TimeSpan.FromMilliseconds(600);
+    private IDisposable? _heardBlink;
 
     public void SyncFromSettings()
     {
