@@ -1,7 +1,7 @@
 # Sub-proyecto 3c — Checklists, temporizadores y bitácora
 
 Fecha: 2026-10-03
-Estado: aprobado por delegación ("tú decides")
+Estado: implementado en la rama `abordo` (aprobado por delegación, "tú decides")
 
 ## Nota previa: palabra de activación "Verse"
 

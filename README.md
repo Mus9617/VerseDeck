@@ -62,6 +62,16 @@ Usa el reconocedor de Windows en español, sin descargas. Junto a tus frases esc
 - **Ultimo que ha oido** (seccion Voz): las 20 ultimas frases reconocidas y por que se ejecutaron o no.
 - Las frases en ingles se reconocen peor con el reconocedor español; si una da problemas, cambiala por una en español.
 
+## A bordo
+
+Checklists, temporizadores y bitacora, por voz o con el raton. No necesitan el juego y no trabajan en reposo.
+
+- **Checklists**: "checklist prevuelo" la empieza; "hecho", "siguiente" o "listo" completa el paso. Si el paso tiene modulo, "hecho" envia esa unica pulsacion; si el modulo falla, el paso no avanza. "Saltar", "repetir" y "cancelar checklist" hacen lo que dicen. Vienen dos de ejemplo, Prevuelo y Aterrizaje, que puedes cambiar o borrar.
+- **Temporizadores**: "avisame en diez minutos" o, con etiqueta, "refineria treinta minutos" (tambien reclamacion, hangar, carga, combustible, mision y descanso). Por voz: de 1 a 15, y 20, 25, 30, 40, 45, 50, 60, 90 y 120. Desde la pantalla, cualquier cantidad. El copiloto avisa en voz alta; si esta apagado, suena el pitido.
+- **Bitacora**: "anota" y lo que quieras recordar. Guarda la hora, el perfil y la nave, y se exporta a un .txt en Documentos. El dictado de Windows falla con nombres propios: revisa la nota en pantalla.
+
+Las frases del copiloto para checklists y temporizadores sin etiqueta se generan de antemano, como las de los modulos. Si hay que generar una al momento, el modelo de voz se libera a los 30 segundos.
+
 ## Panel movil
 
 El servidor solo responde dentro de la red local. El telefono se empareja escribiendo el PIN que muestra la app; sin emparejar no puede listar ni pulsar modulos.
