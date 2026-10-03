@@ -294,6 +294,13 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         deleteVoice.Parameters.AddWithValue("$buttonId", buttonId);
         await deleteVoice.ExecuteNonQueryAsync(cancellationToken);
 
+        // A checklist step on this module keeps its text and just stops sending a key.
+        var unlinkSteps = connection.CreateCommand();
+        unlinkSteps.Transaction = (SqliteTransaction)transaction;
+        unlinkSteps.CommandText = "UPDATE ChecklistSteps SET ButtonId=NULL WHERE ButtonId=$buttonId";
+        unlinkSteps.Parameters.AddWithValue("$buttonId", buttonId);
+        await unlinkSteps.ExecuteNonQueryAsync(cancellationToken);
+
         var deleteButton = connection.CreateCommand();
         deleteButton.Transaction = (SqliteTransaction)transaction;
         deleteButton.CommandText = "DELETE FROM Buttons WHERE Id=$buttonId";
@@ -462,6 +469,10 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         long? Module(string name) => buttons.FirstOrDefault(b => b.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Id;
         ChecklistStep Step(int position, string text, string? module) => new(0, position, text, module is null ? null : Module(module));
 
+        // An interrupted earlier seed may have saved the first example already.
+        var existing = (await repo.GetChecklistsAsync(profileId, cancellationToken)).Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!existing.Contains("Prevuelo"))
+        {
         await repo.SaveChecklistAsync(new Checklist(0, profileId, "Prevuelo",
         [
             Step(1, "Preparar vuelo", "Flight Ready"),
@@ -469,12 +480,18 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             Step(3, "Pedir permiso de despegue", null),
             Step(4, "Despegar y subir el tren", "Landing Gear")
         ]), cancellationToken);
+        }
+
+        if (!existing.Contains("Aterrizaje"))
+        {
         await repo.SaveChecklistAsync(new Checklist(0, profileId, "Aterrizaje",
         [
             Step(1, "Pedir permiso de aterrizaje", null),
             Step(2, "Bajar el tren", "Landing Gear"),
             Step(3, "Apagar motores", "Engines Toggle")
         ]), cancellationToken);
+        }
+
         await UpsertSetting(connection, ChecklistsSeededKey, "Done", cancellationToken);
     }
 

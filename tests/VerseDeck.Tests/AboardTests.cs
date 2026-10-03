@@ -104,7 +104,7 @@ public class ChecklistRunnerTests
     {
         await using var h = await Harness.CreateAsync();
 
-        Assert.False(await h.Shell.Checklists.DoneAsync("Voice"));
+        Assert.Equal(RecognitionOutcome.NothingToDo, await h.Shell.Checklists.DoneAsync("Voice"));
         Assert.False(h.Shell.Checklists.Skip());
         Assert.False(h.Shell.Checklists.Repeat());
         Assert.False(h.Shell.Checklists.Cancel());
@@ -138,7 +138,7 @@ public class ChecklistRunnerTests
         h.Shell.Checklists.Start("Prueba");
         h.Sender.ThrowOnSend = true;
 
-        Assert.True(await runner.DoneAsync("Voice"));
+        Assert.Equal(RecognitionOutcome.Failed, await runner.DoneAsync("Voice"));
 
         Assert.Equal(0, runner.Index);
         Assert.StartsWith("Paso 1 sin completar", runner.StatusText);
@@ -167,7 +167,53 @@ public class ChecklistRunnerTests
         await h.Session.DeleteChecklistAsync(runner.Active!.Id);
 
         Assert.Null(runner.Active);
-        Assert.False(await runner.DoneAsync("Voice"));
+        Assert.Equal(RecognitionOutcome.NothingToDo, await runner.DoneAsync("Voice"));
+    }
+
+    [Fact]
+    public async Task DoneHeardDuringALongPress_IsIgnored()
+    {
+        var (h, runner) = await WithChecklistAsync();
+        await using var _ = h;
+        runner.Start("Prueba");
+        h.Sender.Hold = new TaskCompletionSource();
+
+        var first = runner.DoneAsync("Voice");
+        var second = await runner.DoneAsync("Voice");
+        h.Sender.Hold.SetResult();
+        await first;
+
+        Assert.Equal(RecognitionOutcome.Repeated, second);
+        Assert.Single(h.Sender.Sent);
+        Assert.Equal(1, runner.Index);
+    }
+
+    [Fact]
+    public async Task CancelDuringAPress_DoesNotAdvanceOrCrash()
+    {
+        var (h, runner) = await WithChecklistAsync();
+        await using var _ = h;
+        runner.Start("Prueba");
+        h.Sender.Hold = new TaskCompletionSource();
+
+        var done = runner.DoneAsync("Voice");
+        runner.Cancel();
+        h.Sender.Hold.SetResult();
+
+        Assert.Equal(RecognitionOutcome.Executed, await done);
+        Assert.Null(runner.Active);
+        Assert.Equal("Checklist Prueba cancelada", runner.StatusText);
+    }
+
+    [Fact]
+    public async Task DeletedModule_LeavesTheStepWithoutAKey()
+    {
+        var (h, runner) = await WithChecklistAsync();
+        await using var _ = h;
+
+        await h.Session.DeleteButtonAsync(h.Session.Buttons.First(b => b.Name == "Lights").Id);
+
+        Assert.Null(h.Session.Checklists.Single(c => c.Name == "Prueba").Steps[0].ButtonId);
     }
 
     [Fact]
@@ -224,6 +270,22 @@ public class TimerServiceTests
         Assert.Equal(1, h.Ui.Fire(TimeSpan.FromMinutes(15)));
         Assert.Equal(2, h.Audio.CommandPlays);
         Assert.False(timers.IsScheduled);
+    }
+
+    [Fact]
+    public async Task TimersDueTogether_AreOnePhrase()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        h.Shell.Timers.Add("hangar", TimeSpan.FromMinutes(5));
+        h.Shell.Timers.Add("carga", TimeSpan.FromMinutes(5));
+
+        h.Now += TimeSpan.FromMinutes(5);
+        h.Ui.Fire(TimeSpan.FromMinutes(5));
+        await h.Copilot.Pending;
+        await Task.Delay(200);
+
+        Assert.Contains("Hangar: han pasado cinco minutos. Carga: han pasado cinco minutos.", h.Tts.Synthesized);
     }
 
     [Fact]
@@ -381,6 +443,33 @@ public class CompanionRoutingTests
     }
 
     [Fact]
+    public async Task CompanionCommand_WhileTheCopilotSpeaks_IsIgnored()
+    {
+        await using var h = await ListeningAsync();
+        h.Guard.Speaking(h.Now, h.Now + TimeSpan.FromSeconds(3));
+
+        h.Voice.RaiseCompanion("checklist prevuelo", h.Now);
+        await h.Shell.Voice.Pending;
+
+        Assert.Null(h.Shell.Checklists.Active);
+        Assert.Equal(RecognitionOutcome.CopilotSpeaking, h.Shell.Voice.History[0].Outcome);
+    }
+
+    [Fact]
+    public async Task FailedStepPress_IsRecordedAsFailed()
+    {
+        await using var h = await ListeningAsync();
+        await h.Session.SaveChecklistAsync(new Checklist(0, 0, "Prueba", [new(0, 1, "Luces", h.Session.Buttons.First(b => b.Name == "Lights").Id)]));
+        h.Shell.Checklists.Start("Prueba");
+        h.Sender.ThrowOnSend = true;
+
+        h.Voice.RaiseCompanion("hecho");
+        await h.Shell.Voice.Pending;
+
+        Assert.Equal(RecognitionOutcome.Failed, h.Shell.Voice.History[0].Outcome);
+    }
+
+    [Fact]
     public async Task VoiceTimerAndNote_Work()
     {
         await using var h = await ListeningAsync();
@@ -420,6 +509,28 @@ public class AboardViewModelTests
         h.Shell.Section = "Deck";
         Assert.False(aboard.IsCountingDown);
         Assert.Equal(0, h.Ui.Fire(TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public async Task UnsavedDraft_SurvivesAnUnrelatedReload()
+    {
+        await using var h = await Harness.CreateAsync();
+        var aboard = h.Shell.Aboard;
+        aboard.NewChecklistCommand.Execute(null);
+        aboard.EditName = "Borrador";
+        aboard.EditSteps[0].Text = "Algo";
+        aboard.EditSteps[0].Module = aboard.ModuleChoices.First(m => m.Name == "Lights");
+
+        await h.Session.SaveSettingsAsync(h.Session.Settings with { CopilotVolume = 0.5 });
+
+        Assert.Null(aboard.SelectedChecklist);
+        Assert.Equal("Borrador", aboard.EditName);
+        Assert.Equal("Lights", aboard.EditSteps[0].Module?.Name);
+
+        aboard.SelectedChecklist = aboard.Checklists.First(c => c.Name == "Prevuelo");
+        aboard.EditSteps[0].Text = "Cambiado";
+        await h.Session.SaveSettingsAsync(h.Session.Settings with { CopilotVolume = 0.6 });
+        Assert.Equal("Cambiado", aboard.EditSteps[0].Text);
     }
 
     [Fact]
@@ -523,5 +634,57 @@ public class AboardSpeechTests
 
         Assert.Same(release, h.Copilot.IdleRelease);
         Assert.Equal(before, h.Tts.Unloads);
+    }
+}
+
+public class AboardReviewTests
+{
+    [Fact]
+    public async Task FailedSynthesis_StillReleasesTheModel()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        h.Copilot.IdleUnload = TimeSpan.FromMilliseconds(20);
+        h.Tts.ThrowFor.Add("Esta falla.");
+        var before = h.Tts.Unloads;
+
+        await h.Copilot.SayAsync("Esta falla.");
+        await h.Copilot.IdleRelease;
+
+        Assert.Equal(before + 1, h.Tts.Unloads);
+    }
+
+    [Fact]
+    public async Task InterruptedSeed_DoesNotDuplicateTheFirstExample()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        var profile = (await repository.GetProfilesAsync()).Single(p => p.IsActive);
+        var landing = (await repository.GetChecklistsAsync(profile.Id)).Single(c => c.Name == "Aterrizaje");
+        await repository.DeleteChecklistAsync(landing.Id);
+        await db.ExecuteAsync("DELETE FROM Settings WHERE Key = 'ChecklistsSeededV1';");
+
+        var again = new SqliteVerseDeckRepository(db.Path);
+        await again.InitializeAsync();
+
+        Assert.Equal(["Aterrizaje", "Prevuelo"], (await again.GetChecklistsAsync(profile.Id)).Select(c => c.Name).Order());
+    }
+}
+
+public class AboardWindowTests
+{
+    [Fact]
+    public async Task MinimizedWindow_StopsTheCountdown()
+    {
+        await using var h = await Harness.CreateAsync();
+        h.Shell.Timers.Add(null, TimeSpan.FromMinutes(2));
+        h.Shell.Section = "Abordo";
+        Assert.True(h.Shell.Aboard.IsCountingDown);
+
+        h.Shell.IsMinimized = true;
+        Assert.False(h.Shell.Aboard.IsCountingDown);
+
+        h.Shell.IsMinimized = false;
+        Assert.True(h.Shell.Aboard.IsCountingDown);
     }
 }

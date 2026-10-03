@@ -28,6 +28,7 @@ public sealed class ChecklistRunner
     public int Index { get; private set; }
     public ChecklistStep? Current => Active is null || Index >= Active.Steps.Count ? null : Active.Steps[Index];
     public string StatusText { get; private set; } = string.Empty;
+    private bool _pressing;
 
     /// <summary>The last announcement started in the background, so callers can wait for it.</summary>
     public Task Pending { get; private set; } = Task.CompletedTask;
@@ -66,30 +67,57 @@ public sealed class ChecklistRunner
         return checklist is not null && Start(checklist);
     }
 
-    /// <summary>Completes the current step, sending its module's key if it has one. False when nothing is running.</summary>
-    public async Task<bool> DoneAsync(string source)
+    /// <summary>
+    /// Completes the current step, sending its module's key if it has one. A 'done' heard while that key is
+    /// still being pressed is ignored, so a step can never be pressed twice or skipped.
+    /// </summary>
+    public async Task<RecognitionOutcome> DoneAsync(string source)
     {
         var step = Current;
         if (step is null)
         {
-            return false;
+            return RecognitionOutcome.NothingToDo;
         }
 
+        if (_pressing)
+        {
+            return RecognitionOutcome.Repeated;
+        }
+
+        var checklist = Active;
+        var index = Index;
         var button = step.ButtonId is { } id ? _session.Buttons.FirstOrDefault(b => b.Id == id) : null;
         if (button is not null)
         {
-            var result = await _executor.ExecuteAsync(button, source);
+            ExecuteResult result;
+            _pressing = true;
+            try
+            {
+                result = await _executor.ExecuteAsync(button, source);
+            }
+            finally
+            {
+                _pressing = false;
+            }
+
+            // Cancelled, edited or switched while the key was held: whatever is running now is not this step.
+            if (!ReferenceEquals(Active, checklist) || Index != index)
+            {
+                return result == ExecuteResult.Sent ? RecognitionOutcome.Executed : RecognitionOutcome.Failed;
+            }
+
             if (result != ExecuteResult.Sent)
             {
                 // The step stays where it is: the player decides whether to retry or skip it.
-                StatusText = $"Paso {Index + 1} sin completar: {_executor.LastError ?? "cancelado"}";
+                var why = result == ExecuteResult.Cancelled ? "cancelado" : _executor.LastError ?? "fallo al enviar";
+                StatusText = $"Paso {Index + 1} sin completar: {why}";
                 Changed?.Invoke(this, EventArgs.Empty);
-                return true;
+                return RecognitionOutcome.Failed;
             }
         }
 
         Advance();
-        return true;
+        return RecognitionOutcome.Executed;
     }
 
     public bool Skip()
@@ -331,13 +359,16 @@ public sealed class TimerService
     {
         _next = null;
         var now = _clock();
-        foreach (var timer in _timers.Where(t => !t.Fired && t.Due <= now).ToList())
+        var due = _timers.Where(t => !t.Fired && t.Due <= now).ToList();
+        foreach (var timer in due)
         {
             timer.Fired = true;
-            if (!Say(Alert(timer)))
-            {
-                _audio.PlayCommand();
-            }
+        }
+
+        // Timers due together are said as one phrase: a second phrase would cut the first one off.
+        if (due.Count > 0 && !Say(string.Join(' ', due.Select(Alert))))
+        {
+            _audio.PlayCommand();
         }
 
         Schedule();

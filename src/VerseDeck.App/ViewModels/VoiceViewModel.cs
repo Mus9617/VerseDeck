@@ -90,8 +90,8 @@ public sealed partial class VoiceViewModel : ObservableObject
     /// <summary>Checks phrases offline with the copilot's voice; set by the shell.</summary>
     public VoiceDoctor? Doctor { get; set; }
 
-    /// <summary>Carries out checklist, timer and note requests; set by the shell. Returns false when there was nothing to do.</summary>
-    public Func<CompanionCommand, Task<bool>>? CompanionHandler { get; set; }
+    /// <summary>Carries out checklist, timer and note requests; set by the shell. Returns what came of it.</summary>
+    public Func<CompanionCommand, Task<RecognitionOutcome>>? CompanionHandler { get; set; }
 
     public const int HistorySize = 20;
 
@@ -441,8 +441,8 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
 
         _lastRecognition = now;
-        var handled = CompanionHandler is not null && await CompanionHandler(e.Command);
-        Record(e.Text, e.Confidence, handled ? RecognitionOutcome.Executed : RecognitionOutcome.NothingToDo);
+        var outcome = CompanionHandler is null ? RecognitionOutcome.NothingToDo : await CompanionHandler(e.Command);
+        Record(e.Text, e.Confidence, outcome);
     }
 
     // Everything the running engine depends on: what it listens for and how it is activated.

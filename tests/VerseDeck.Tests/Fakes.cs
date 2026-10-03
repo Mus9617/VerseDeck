@@ -37,6 +37,9 @@ public sealed class FakeInputSender : IInputSender
     public List<KeyPressAction> Sent { get; } = [];
     public bool ThrowOnSend { get; set; }
 
+    /// <summary>When set, a press stays held until this completes, like a long press.</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
     public Task SendAsync(KeyPressAction action, CancellationToken cancellationToken = default)
     {
         if (ThrowOnSend)
@@ -45,6 +48,6 @@ public sealed class FakeInputSender : IInputSender
         }
 
         Sent.Add(action);
-        return Task.CompletedTask;
+        return Hold?.Task ?? Task.CompletedTask;
     }
 }

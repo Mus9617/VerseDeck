@@ -60,9 +60,16 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
 
         foreach (var recognizer in recognizers)
         {
+            // Only the first engine has the companion vocabulary; another one with no module phrases has nothing to hear.
+            if (_engines.Count > 0 && _commands.Count == 0)
+            {
+                continue;
+            }
+
+            SpeechRecognitionEngine? engine = null;
             try
             {
-                var engine = new SpeechRecognitionEngine(recognizer);
+                engine = new SpeechRecognitionEngine(recognizer);
                 // Only the first engine gets the discard model and the companion vocabulary: a second one would
                 // double their cost and hear every checklist word twice.
                 var primary = _engines.Count == 0;
@@ -94,6 +101,12 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             catch (Exception ex)
             {
                 Diagnostic?.Invoke(this, $"Voice engine failed for {recognizer.Culture.Name}: {ex.Message}");
+                if (engine is not null && !_engines.Contains(engine))
+                {
+                    engine.SpeechRecognized -= OnSpeechRecognized;
+                    engine.SpeechRecognitionRejected -= OnSpeechRejected;
+                    engine.Dispose();
+                }
             }
         }
 

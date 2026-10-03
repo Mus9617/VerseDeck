@@ -338,8 +338,23 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 
     partial void OnIsMutedChanged(bool value) => _services.Copilot.Muted = value;
 
+    /// <summary>Set by the window: nothing on screen needs refreshing while it is minimized.</summary>
+    public bool IsMinimized
+    {
+        get => _isMinimized;
+        set
+        {
+            _isMinimized = value;
+            UpdateAboardVisibility();
+        }
+    }
+
+    private bool _isMinimized;
+
     // The countdown only ticks while its section is on screen.
-    partial void OnSectionChanged(string value) => Aboard.IsVisible = value == "Abordo";
+    partial void OnSectionChanged(string value) => UpdateAboardVisibility();
+
+    private void UpdateAboardVisibility() => Aboard.IsVisible = Section == "Abordo" && !_isMinimized;
 
     public void Info(string message)
     {

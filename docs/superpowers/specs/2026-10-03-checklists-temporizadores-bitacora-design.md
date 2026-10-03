@@ -62,26 +62,30 @@ Se añaden al vocabulario del motor en vivo (además de las frases de módulos):
 | "repetir" | El copiloto repite el paso actual |
 | "cancelar checklist" | Termina la checklist |
 | "avísame en <n> minutos/segundos" | Temporizador sin nombre |
-| "temporizador <etiqueta> <n> minutos" | Temporizador con nombre |
+| "<etiqueta> <n> minutos/segundos" | Temporizador con nombre ("refinería treinta minutos"; la forma "temporizador …" se confundía con palabras de control en la prueba real) |
 | "cancelar temporizadores" | Borra todos |
 | "anota <texto libre>" / "nota <texto libre>" | Nota en la bitácora |
 
-Números: de uno a ciento veinte, en palabras (el reconocedor devuelve
-palabras). Etiquetas: refinería, reclamación, hangar, carga, combustible,
+Números por voz: 1–15, 20, 25, 30, 40, 45, 50, 60, 90 y 120 (con el rango
+completo, "treinta" se oyó como "quince"); desde la pantalla, cualquiera. Etiquetas: refinería, reclamación, hangar, carga, combustible,
 misión, descanso.
 
 ## Checklists
 
 - Datos: tabla `Checklists(Id, ProfileId, Name)` y `ChecklistSteps(Id,
   ChecklistId, Position, Text, ButtonId NULL)`. Se clonan con el perfil.
-- Dos de ejemplo sembradas una sola vez: "Prevuelo" (Energía general,
-  Motores, Escudos, Preparar vuelo) y "Aterrizaje" (Pedir permiso, Tren,
-  Motores), vinculadas a los módulos por defecto si existen.
-- En marcha: el copiloto dice "Paso 1 de 4: Energía." Con el copiloto
+- Dos de ejemplo sembradas una sola vez: "Prevuelo" (Preparar vuelo, Luces,
+  Pedir permiso de despegue, Despegar y subir el tren) y "Aterrizaje" (Pedir
+  permiso de aterrizaje, Bajar el tren, Apagar motores), vinculadas a los módulos por defecto si existen.
+- En marcha: el copiloto dice "Paso 1 de 4: Preparar vuelo." Las frases de
+  checklists y temporizadores sin etiqueta se generan en el calentamiento; una
+  generada al momento libera el modelo a los 30 s. Con el copiloto
   apagado o sin voz, el paso se muestra en pantalla y en el pie.
 - "Hecho" en un paso vinculado ejecuta ese módulo con el mismo ejecutor que
   un clic (confirmación, bloqueo de módulos sin tecla, sonido, historial).
 - También se puede avanzar con botones en la sección.
+- Un "hecho" oído mientras la tecla del paso sigue pulsada se ignora; si la
+  pulsación falla o se cancela, el paso no avanza.
 - Al terminar: "Checklist Prevuelo completa."
 
 ## Temporizadores

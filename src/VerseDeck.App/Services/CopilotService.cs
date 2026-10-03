@@ -298,9 +298,16 @@ public sealed class CopilotService
             var source = phrase is null ? "generated" : "cache";
             if (phrase is null)
             {
-                var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
-                phrase = _cache.Store(voice, text, audio);
-                UnloadWhenIdle();
+                try
+                {
+                    var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
+                    phrase = _cache.Store(voice, text, audio);
+                }
+                finally
+                {
+                    // Even a failed attempt may have loaded the model.
+                    UnloadWhenIdle();
+                }
             }
 
             if (mine != Volatile.Read(ref _sequence) || (Muted && !force))

@@ -57,6 +57,8 @@ public sealed partial class AboardViewModel : ObservableObject
     private readonly IStatusSink _status;
     private readonly Func<string> _exportFolder;
     private IDisposable? _countdown;
+    private bool _keepDraft;
+    private bool _newDraft;
 
     [ObservableProperty]
     private Checklist? _selectedChecklist;
@@ -120,8 +122,18 @@ public sealed partial class AboardViewModel : ObservableObject
 
     public Task InitializeAsync() => RefreshNotesAsync();
 
-    /// <summary>Carries out a checklist, timer or note request heard by voice. False when there was nothing to do.</summary>
-    public async Task<bool> HandleAsync(CompanionCommand command)
+    /// <summary>Carries out a checklist, timer or note request heard by voice, and says how it went.</summary>
+    public async Task<RecognitionOutcome> HandleAsync(CompanionCommand command)
+    {
+        if (command.Kind == CompanionKind.Done)
+        {
+            return await _runner.DoneAsync("Voice");
+        }
+
+        return await HandleOtherAsync(command) ? RecognitionOutcome.Executed : RecognitionOutcome.NothingToDo;
+    }
+
+    private async Task<bool> HandleOtherAsync(CompanionCommand command)
     {
         switch (command.Kind)
         {
@@ -133,8 +145,6 @@ public sealed partial class AboardViewModel : ObservableObject
 
                 _status.Error($"No hay ninguna checklist llamada '{command.Name}'.");
                 return false;
-            case CompanionKind.Done:
-                return await _runner.DoneAsync("Voice");
             case CompanionKind.Skip:
                 return _runner.Skip();
             case CompanionKind.Repeat:
@@ -191,6 +201,7 @@ public sealed partial class AboardViewModel : ObservableObject
     private void NewChecklist()
     {
         SelectedChecklist = null;
+        _newDraft = true;
         EditName = string.Empty;
         EditSteps.Clear();
         EditSteps.Add(new StepRow(string.Empty, ModuleChoices.FirstOrDefault()));
@@ -234,6 +245,7 @@ public sealed partial class AboardViewModel : ObservableObject
         try
         {
             var saved = await _session.SaveChecklistAsync(new Checklist(SelectedChecklist?.Id ?? 0, _session.ActiveProfile?.Id ?? 0, EditName, steps));
+            _newDraft = false;
             SelectedChecklist = Checklists.FirstOrDefault(c => c.Id == saved.Id);
             _status.Info($"Checklist guardada: {saved.Name}");
 
@@ -246,6 +258,10 @@ public sealed partial class AboardViewModel : ObservableObject
         catch (InvalidOperationException ex)
         {
             _status.Error(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _status.Error($"No se pudo guardar la checklist: {ex.Message}");
         }
     }
 
@@ -265,11 +281,12 @@ public sealed partial class AboardViewModel : ObservableObject
 
     partial void OnSelectedChecklistChanged(Checklist? value)
     {
-        if (value is null)
+        if (value is null || _keepDraft)
         {
             return;
         }
 
+        _newDraft = false;
         EditName = value.Name;
         EditSteps.Clear();
         foreach (var step in value.Steps)
@@ -278,14 +295,25 @@ public sealed partial class AboardViewModel : ObservableObject
         }
     }
 
+    // Runs on every session change (a setting, a module edit): what the player is typing must survive it.
     private void SyncChecklists()
     {
         var selected = SelectedChecklist?.Id;
-        ModuleChoices.Clear();
-        ModuleChoices.Add(new ModuleChoice(null, "(sin tecla)"));
-        foreach (var button in _session.Buttons.OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase))
+        var choices = new List<ModuleChoice> { new(null, "(sin tecla)") };
+        choices.AddRange(_session.Buttons.OrderBy(b => b.Name, StringComparer.OrdinalIgnoreCase).Select(b => new ModuleChoice(b.Id, b.Name)));
+        if (!choices.SequenceEqual(ModuleChoices))
         {
-            ModuleChoices.Add(new ModuleChoice(button.Id, button.Name));
+            var picked = EditSteps.Select(s => s.Module?.Id).ToList();
+            ModuleChoices.Clear();
+            foreach (var choice in choices)
+            {
+                ModuleChoices.Add(choice);
+            }
+
+            for (var i = 0; i < EditSteps.Count; i++)
+            {
+                EditSteps[i].Module = choices.FirstOrDefault(c => c.Id == picked[i]) ?? choices[0];
+            }
         }
 
         Checklists.Clear();
@@ -294,7 +322,16 @@ public sealed partial class AboardViewModel : ObservableObject
             Checklists.Add(checklist);
         }
 
-        SelectedChecklist = Checklists.FirstOrDefault(c => c.Id == selected) ?? Checklists.FirstOrDefault();
+        var same = Checklists.FirstOrDefault(c => c.Id == selected);
+        _keepDraft = same is not null || (selected is null && _newDraft);
+        try
+        {
+            SelectedChecklist = same ?? (_keepDraft ? null : Checklists.FirstOrDefault());
+        }
+        finally
+        {
+            _keepDraft = false;
+        }
     }
 
     private void SyncRunner()
