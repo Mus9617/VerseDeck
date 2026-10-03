@@ -9,6 +9,7 @@ public sealed class FakeTtsEngine : ITtsEngine
 
     public List<string> Synthesized { get; } = [];
     public bool Throw { get; set; }
+    public HashSet<string> ThrowFor { get; } = [];
     public double Seconds { get; set; } = 1.0;
 
     /// <summary>Makes synthesis of this text wait until <see cref="Release"/> is called, like a slow model.</summary>
@@ -18,7 +19,7 @@ public sealed class FakeTtsEngine : ITtsEngine
 
     public async Task<SpeechAudio> SynthesizeAsync(VoiceInfo voice, string text, CancellationToken cancellationToken)
     {
-        if (Throw)
+        if (Throw || ThrowFor.Contains(text))
         {
             throw new InvalidOperationException("model failed to load");
         }

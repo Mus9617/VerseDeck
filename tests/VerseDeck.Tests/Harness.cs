@@ -57,6 +57,7 @@ public sealed class FakeVoiceService : IVoiceCommandService
     public event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
     public event EventHandler<string>? Diagnostic;
     public event EventHandler<RecognitionHeard>? Heard;
+    public bool UseDiscardModel { get; set; }
 
     public void RaiseHeard(string text, RecognitionOutcome outcome, double confidence = 0.5) => Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
 

@@ -248,9 +248,23 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
+        var buttonId = _button.Id;
         PhraseTestResult = "Comprobando...";
-        var verdict = await Doctor.CheckPhraseAsync(_button.Id, NewPhrase);
-        PhraseTestResult = verdict.Text;
+        string result;
+        try
+        {
+            result = (await Doctor.CheckPhraseAsync(buttonId, NewPhrase)).Text;
+        }
+        catch (OperationCanceledException)
+        {
+            result = "Comprobacion cancelada.";
+        }
+
+        // The player may have moved to another module while the check ran.
+        if (_button?.Id == buttonId)
+        {
+            PhraseTestResult = result;
+        }
     }
 
     [RelayCommand]

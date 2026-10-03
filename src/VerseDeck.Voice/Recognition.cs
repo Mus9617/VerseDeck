@@ -14,10 +14,13 @@ public static class CommandGrammar
     public const string Commands = "commands";
     public const string Discard = "discard";
 
-    public static void Load(SpeechRecognitionEngine engine, IEnumerable<string> phrases)
+    public static void Load(SpeechRecognitionEngine engine, IEnumerable<string> phrases, bool withDiscard = true)
     {
         engine.LoadGrammar(new Grammar(new GrammarBuilder(new Choices(phrases.ToArray())) { Culture = engine.RecognizerInfo.Culture }) { Name = Commands });
-        engine.LoadGrammar(new DictationGrammar { Name = Discard });
+        if (withDiscard)
+        {
+            engine.LoadGrammar(new DictationGrammar { Name = Discard });
+        }
     }
 
     /// <summary>Spanish recognisers first, then English ones; the first is used for phrase checks.</summary>
@@ -57,6 +60,9 @@ public sealed record PhraseHit(string? Text, double Confidence, bool Discarded);
 
 public interface IPhraseChecker
 {
+    /// <summary>False when Windows has no recogniser to check with, so nothing is generated for nothing.</summary>
+    bool IsAvailable { get; }
+
     /// <summary>Recognises each WAV file against the phrases, without a microphone and without the live engine.</summary>
     Task<IReadOnlyList<PhraseHit>> CheckAsync(IReadOnlyList<string> phrases, IReadOnlyList<string> wavPaths, CancellationToken cancellationToken);
 }
@@ -67,6 +73,8 @@ public interface IPhraseChecker
 /// </summary>
 public sealed class WindowsPhraseChecker : IPhraseChecker
 {
+    public bool IsAvailable => CommandGrammar.Recognizers().Count > 0;
+
     private const int TargetRate = 16000;
     private const int PaddingSamples = TargetRate * 3 / 10;
 
@@ -108,7 +116,7 @@ public sealed class WindowsPhraseChecker : IPhraseChecker
             {
                 File.Delete(temporary);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // A leftover temp file is harmless.
             }
@@ -118,9 +126,20 @@ public sealed class WindowsPhraseChecker : IPhraseChecker
     }
 
     /// <summary>Converts a 16-bit mono PCM WAV to 16 kHz with a short silence either side, as a real utterance has.</summary>
-    internal static void ToRecognizerFormat(string source, string target)
+    public static void ToRecognizerFormat(string source, string target)
     {
         var bytes = File.ReadAllBytes(source);
+
+        // Only the files VerseDeck writes itself are expected here: 16-bit mono PCM with a plain 44-byte header.
+        if (bytes.Length < 44
+            || BitConverter.ToInt16(bytes, 20) != 1
+            || BitConverter.ToInt16(bytes, 22) != 1
+            || BitConverter.ToInt16(bytes, 34) != 16
+            || BitConverter.ToInt32(bytes, 24) <= 0)
+        {
+            throw new InvalidDataException("El audio de prueba no es WAV PCM de 16 bits mono.");
+        }
+
         var rate = BitConverter.ToInt32(bytes, 24);
         var input = new short[(bytes.Length - 44) / 2];
         Buffer.BlockCopy(bytes, 44, input, 0, input.Length * 2);

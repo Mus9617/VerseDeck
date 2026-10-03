@@ -126,6 +126,13 @@ public interface IVoiceCommandService : IDisposable
 
     /// <summary>Everything the engine heard but did not turn into a command, with the reason.</summary>
     event EventHandler<RecognitionHeard>? Heard;
+
+    /// <summary>
+    /// Free dictation competing with the commands, so conversation is not taken for one. It costs about ten
+    /// times the CPU per utterance and tens of megabytes, so it is only worth it when always listening.
+    /// Applied on the next start.
+    /// </summary>
+    bool UseDiscardModel { get; set; }
     bool IsRunning { get; }
     void PauseRecognition();
     void ResumeRecognition();

@@ -13,6 +13,7 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
     public event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
     public event EventHandler<string>? Diagnostic;
     public event EventHandler<RecognitionHeard>? Heard;
+    public bool UseDiscardModel { get; set; }
     public bool IsRunning => _engines.Count > 0;
     public bool IsListening => _isListening;
     public bool IsInputGateOpen => DateTimeOffset.Now <= _gateOpenUntil;
@@ -54,6 +55,11 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         }
 
         var recognizers = CommandGrammar.Recognizers().ToList();
+        if (recognizers.Count == 0)
+        {
+            // A Windows without Spanish or English speech still gets whatever recogniser it has.
+            recognizers = SpeechRecognitionEngine.InstalledRecognizers().Take(1).ToList();
+        }
         Diagnostic?.Invoke(this, $"Installed recognizers: {string.Join(", ", SpeechRecognitionEngine.InstalledRecognizers().Select(r => $"{r.Culture.Name}/{r.Description}"))}");
         Diagnostic?.Invoke(this, $"Selected recognizers: {string.Join(", ", recognizers.Select(r => $"{r.Culture.Name}/{r.Description}"))}");
 
@@ -62,7 +68,8 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             try
             {
                 var engine = new SpeechRecognitionEngine(recognizer);
-                CommandGrammar.Load(engine, _commands.Keys);
+                // Only the first engine gets the discard model: a second one would double its cost for little gain.
+                CommandGrammar.Load(engine, _commands.Keys, UseDiscardModel && _engines.Count == 0);
                 engine.SpeechDetected += (_, _) => Diagnostic?.Invoke(this, $"Voice speech detected by {engine.RecognizerInfo.Culture.Name}");
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
@@ -154,7 +161,11 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         if (rejected is { } outcome)
         {
             Diagnostic?.Invoke(this, $"Voice {outcome} '{text}' confidence={Invariant.Format(confidence)}");
-            Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
+            // Secondary engines hear the same audio; only the primary one explains itself in the history.
+            if (ReferenceEquals(sender, _engines.FirstOrDefault()))
+            {
+                Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
+            }
             return;
         }
 

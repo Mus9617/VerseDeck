@@ -280,6 +280,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         var commands = _session.VoiceCommands
             .Select(c => c with { MinimumConfidence = Math.Min(c.MinimumConfidence, settings.VoiceMinimumConfidence) })
             .ToList();
+        _voice.UseDiscardModel = settings.VoiceActivationMode != PushToTalk;
         await _voice.StartAsync(commands, _session.Buttons);
         if (!_voice.IsRunning)
         {

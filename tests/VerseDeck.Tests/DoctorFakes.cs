@@ -22,6 +22,8 @@ public sealed class FakePhraseChecker : IPhraseChecker
     public Dictionary<string, PhraseHit> HeardAs { get; } = [];
     public Dictionary<(string Voice, string Phrase), PhraseHit> HeardAsByVoice { get; } = [];
     public Exception? Fail { get; set; }
+    public bool Available { get; set; } = true;
+    public bool IsAvailable => Available;
     public TaskCompletionSource? Hold { get; set; }
     public int Calls { get; private set; }
     public List<IReadOnlyList<string>> Grammars { get; } = [];

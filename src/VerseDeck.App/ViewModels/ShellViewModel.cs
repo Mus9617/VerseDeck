@@ -245,6 +245,15 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Voice.RequestSelect = Deck.Select;
         services.Session.Changed += (_, _) => OnSessionChanged();
         services.Executor.Sent += (_, _) => _ = Activity.RefreshAsync();
+
+        // Phone presses from the last seconds before the panel stops would otherwise wait for another event.
+        Mobile.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MobileLinkViewModel.State) && Mobile.State == LinkState.Offline)
+            {
+                _ = Activity.RefreshAsync();
+            }
+        };
     }
 
     public DeckViewModel Deck { get; }
@@ -256,6 +265,9 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public SettingsViewModel Settings { get; }
     public ControlsViewModel Controls { get; }
     public CopilotViewModel Copilot { get; }
+
+    /// <summary>The work of the last periodic tick, so tests can wait for it.</summary>
+    public Task RefreshTick { get; private set; } = Task.CompletedTask;
 
     /// <summary>The copilot's greeting and phrase warm-up, started at launch and never awaited by the interface.</summary>
     public Task CopilotStart { get; private set; } = Task.CompletedTask;
@@ -331,15 +343,16 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     // phone panel is on: clicks and voice already refresh it through events, and the game needs the CPU.
     private void ScheduleRefresh()
     {
-        _refreshTimer = _services.Ui.After(RefreshInterval, async () =>
+        _refreshTimer = _services.Ui.After(RefreshInterval, () =>
         {
-            if (Mobile.State == LinkState.Online)
-            {
-                await Activity.RefreshAsync();
-                Mobile.Refresh();
-            }
-
+            RefreshTick = Mobile.State == LinkState.Online ? RefreshForPhoneAsync() : Task.CompletedTask;
             ScheduleRefresh();
         });
+    }
+
+    private async Task RefreshForPhoneAsync()
+    {
+        await Activity.RefreshAsync();
+        Mobile.Refresh();
     }
 }

@@ -143,6 +143,9 @@
                                     <DataTrigger Binding="{Binding Kind}" Value="NotUnderstood">
                                         <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource Warning}"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding Kind}" Value="LowConfidence">
+                                        <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource Warning}"/>
+                                    </DataTrigger>
                                     <DataTrigger Binding="{Binding Kind}" Value="Unchecked">
                                         <Setter TargetName="Verdict" Property="Foreground" Value="{DynamicResource TextMuted}"/>
                                     </DataTrigger>
