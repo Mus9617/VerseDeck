@@ -48,7 +48,11 @@ Una voz neuronal que confirma tus ordenes. Se genera en tu PC con [sherpa-onnx](
 - Cada frase se genera una vez y se guarda; despues suena al instante.
 - Interruptores: general, SILENCIO en la cabecera, solo comandos de voz, por categoria y por modulo (frase de la personalidad, texto propio o ninguna).
 - Las frases confirman la orden, no el estado de la nave: VerseDeck sabe que envio la tecla, nada mas.
-- Un modulo vinculado a una accion sin tecla en el juego ya no envia la tecla que tenia antes: avisa y no envia nada.
+- Un modulo vinculado a una accion sin tecla en el juego ya no envia la tecla que tenia antes: avisa y no envia nada, tambien desde el telefono.
+- Mientras el copiloto habla, lo que oiga el microfono se descarta: su propia voz no puede disparar un comando.
+- El copiloto contesta a los clics del deck y a los comandos de voz. Los toques desde el panel movil no se contestan.
+
+Licencias de lo que usa esta funcion: sherpa-onnx (Apache 2.0), ONNX Runtime (MIT) y SharpCompress (MIT). Los modelos de voz y los binarios de sherpa-onnx incluyen datos y codigo de eSpeak NG, que se publica bajo GPL 3.0; tenlo en cuenta si redistribuyes la aplicacion.
 
 ## Panel movil
 

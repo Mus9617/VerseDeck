@@ -88,6 +88,7 @@ public class VoiceCatalogTests
             Assert.False(store.IsInstalled(SpeechFixture.Voice));
 
             File.WriteAllText(Path.Combine(store.FolderOf(SpeechFixture.Voice), SpeechFixture.Voice.Model), "x");
+            File.WriteAllText(Path.Combine(store.FolderOf(SpeechFixture.Voice), VoiceStore.TokensFile), "x");
             Assert.True(store.IsInstalled(SpeechFixture.Voice));
         }
         finally

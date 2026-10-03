@@ -87,7 +87,7 @@ public sealed class FakeVoiceService : IVoiceCommandService
         LastGrace = releaseGrace;
     }
 
-    public void Raise(VoiceCommand command, DeckButton button) => CommandRecognized?.Invoke(this, new VoiceRecognizedEventArgs(command, button, 0.9));
+    public void Raise(VoiceCommand command, DeckButton button, DateTimeOffset? heardAt = null) => CommandRecognized?.Invoke(this, new VoiceRecognizedEventArgs(command, button, 0.9, heardAt));
 
     public void Dispose()
     {
@@ -141,6 +141,7 @@ public sealed class FakeMobileLink : IMobileLink
     public string Url { get; private set; } = string.Empty;
     public int ConnectedCount { get; set; }
     public string? LastPin { get; private set; }
+    public Func<DeckButton, string?>? BlockReason { get; set; }
 
     public Task StartAsync(int port, string pin)
     {

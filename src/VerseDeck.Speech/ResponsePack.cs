@@ -117,7 +117,10 @@ public sealed class ResponseSelector
 
         if (custom.Length > 0)
         {
-            return custom.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            return custom.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(variant => Fill(variant, button.Name))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
         }
 
         if (_pack.Actions.TryGetValue(button.GameAction ?? string.Empty, out var byAction))
@@ -137,9 +140,16 @@ public sealed class ResponseSelector
     // The same wording twice in a row sounds like a recording, so the previous choice is skipped.
     private string Pick(string key, IReadOnlyList<string> variants)
     {
-        var candidates = variants.Count > 1 && _last.TryGetValue(key, out var previous)
-            ? variants.Where(v => v != previous).ToList()
-            : variants;
+        IReadOnlyList<string> candidates = variants;
+        if (variants.Count > 1 && _last.TryGetValue(key, out var previous))
+        {
+            var others = variants.Where(v => v != previous).ToList();
+            if (others.Count > 0)
+            {
+                candidates = others;
+            }
+        }
+
         var chosen = candidates[_random.Next(candidates.Count)];
         _last[key] = chosen;
         return chosen;

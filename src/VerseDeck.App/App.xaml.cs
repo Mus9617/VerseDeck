@@ -50,6 +50,8 @@ public partial class App : Application
         var executor = new ButtonExecutor(inputSender, repository, dialogs, audio, log, () => session.Settings);
 
         var voiceStore = new VoiceStore(Path.Combine(AppDataPath, "voices"));
+        var voiceInstaller = new VoiceInstaller(new HttpClient { Timeout = TimeSpan.FromMinutes(30) }, voiceStore);
+        voiceInstaller.CleanLeftovers();
         var speechGuard = new SpeechGuard();
         var copilot = new CopilotService(
             session,
@@ -81,7 +83,7 @@ public partial class App : Application
             catalog,
             copilot,
             speechGuard,
-            new VoiceInstaller(new HttpClient { Timeout = TimeSpan.FromMinutes(30) }, voiceStore),
+            voiceInstaller,
             DrainInput: inputSender.WhenIdleAsync));
     }
 

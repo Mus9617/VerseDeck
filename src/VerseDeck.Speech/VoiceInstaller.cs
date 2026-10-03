@@ -3,17 +3,21 @@ using SharpCompress.Readers;
 
 namespace VerseDeck.Speech;
 
-/// <summary>
-/// Downloads a voice model on the player's request. This is the only code in VerseDeck's copilot that
-/// uses the network, and a voice only counts as installed once the whole archive verified and extracted.
-/// </summary>
 public interface IVoiceInstaller
 {
     Task InstallAsync(VoiceInfo voice, IProgress<double>? progress, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Downloads a voice model on the player's request. This is the only code in VerseDeck's copilot that
+/// uses the network, and a voice only counts as installed once the whole archive verified and extracted.
+/// </summary>
 public sealed class VoiceInstaller : IVoiceInstaller
 {
+    private const string DownloadsFolder = ".descargas";
+    private const string StagingPrefix = ".tmp-";
+    private const string ReplacedPrefix = ".old-";
+
     private readonly HttpClient _http;
     private readonly VoiceStore _store;
 
@@ -25,9 +29,9 @@ public sealed class VoiceInstaller : IVoiceInstaller
 
     public async Task InstallAsync(VoiceInfo voice, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var downloads = Path.Combine(_store.Root, ".descargas");
+        var downloads = Path.Combine(_store.Root, DownloadsFolder);
         var archive = Path.Combine(downloads, $"{voice.Folder}.{Guid.NewGuid():N}.tar.bz2");
-        var staging = Path.Combine(_store.Root, $".tmp-{Guid.NewGuid():N}");
+        var staging = Path.Combine(_store.Root, $"{StagingPrefix}{Guid.NewGuid():N}");
         Directory.CreateDirectory(downloads);
         try
         {
@@ -35,18 +39,12 @@ public sealed class VoiceInstaller : IVoiceInstaller
             await Task.Run(() => Extract(archive, staging, cancellationToken), cancellationToken);
 
             var extracted = Path.Combine(staging, voice.Folder);
-            if (!File.Exists(Path.Combine(extracted, voice.Model)))
+            if (!File.Exists(Path.Combine(extracted, voice.Model)) || !File.Exists(Path.Combine(extracted, VoiceStore.TokensFile)))
             {
                 throw new InvalidDataException("El archivo descargado no contiene el modelo de voz esperado.");
             }
 
-            var target = _store.FolderOf(voice);
-            if (Directory.Exists(target))
-            {
-                Directory.Delete(target, recursive: true);
-            }
-
-            Directory.Move(extracted, target);
+            Swap(extracted, _store.FolderOf(voice));
             progress?.Report(1);
         }
         finally
@@ -62,6 +60,63 @@ public sealed class VoiceInstaller : IVoiceInstaller
         if (Directory.Exists(folder))
         {
             Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>Removes what an interrupted install left behind. Call once at startup, before any install.</summary>
+    public void CleanLeftovers()
+    {
+        if (!Directory.Exists(_store.Root))
+        {
+            return;
+        }
+
+        foreach (var folder in Directory.EnumerateDirectories(_store.Root).ToList())
+        {
+            var name = Path.GetFileName(folder);
+            if (name.StartsWith(StagingPrefix, StringComparison.Ordinal) || name.StartsWith(ReplacedPrefix, StringComparison.Ordinal))
+            {
+                TryDelete(() => Directory.Delete(folder, recursive: true));
+            }
+        }
+
+        var downloads = Path.Combine(_store.Root, DownloadsFolder);
+        if (Directory.Exists(downloads))
+        {
+            foreach (var file in Directory.EnumerateFiles(downloads).ToList())
+            {
+                TryDelete(() => File.Delete(file));
+            }
+        }
+    }
+
+    // The old voice is moved aside first, so a failed move never leaves a half-removed folder that looks installed.
+    private void Swap(string extracted, string target)
+    {
+        string? replaced = null;
+        if (Directory.Exists(target))
+        {
+            replaced = Path.Combine(_store.Root, $"{ReplacedPrefix}{Guid.NewGuid():N}");
+            Directory.Move(target, replaced);
+        }
+
+        try
+        {
+            Directory.Move(extracted, target);
+        }
+        catch
+        {
+            if (replaced is not null && !Directory.Exists(target))
+            {
+                Directory.Move(replaced, target);
+            }
+
+            throw;
+        }
+
+        if (replaced is not null)
+        {
+            TryDelete(() => Directory.Delete(replaced, recursive: true));
         }
     }
 
@@ -87,8 +142,8 @@ public sealed class VoiceInstaller : IVoiceInstaller
                 await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 done += read;
 
-                // The last few percent are the extraction, reported by the caller as 1.
-                progress?.Report(total > 0 ? Math.Min(0.95, 0.95 * done / total) : 0);
+                // The rest of the bar is the extraction, reported by the caller as 1.
+                progress?.Report(total > 0 ? Math.Min(0.9, 0.9 * done / total) : 0);
             }
         }
 
@@ -105,6 +160,7 @@ public sealed class VoiceInstaller : IVoiceInstaller
         Directory.CreateDirectory(staging);
         using var stream = File.OpenRead(archive);
         using var reader = ReaderFactory.OpenReader(stream);
+        var buffer = new byte[81920];
         while (reader.MoveToNextEntry())
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -124,7 +180,14 @@ public sealed class VoiceInstaller : IVoiceInstaller
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             using var output = File.Create(destination);
             using var input = reader.OpenEntryStream();
-            input.CopyTo(output);
+
+            // Copied in pieces so that Cancel is noticed inside a model of hundreds of megabytes.
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                output.Write(buffer, 0, read);
+            }
         }
     }
 
@@ -136,7 +199,7 @@ public sealed class VoiceInstaller : IVoiceInstaller
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Leftover temporary files are harmless and are overwritten by name on the next attempt.
+            // Whatever cannot be removed now is removed by CleanLeftovers at the next start.
         }
     }
 }

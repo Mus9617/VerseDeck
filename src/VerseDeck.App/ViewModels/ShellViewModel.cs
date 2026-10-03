@@ -222,9 +222,13 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Copilot = new CopilotViewModel(services.Session, services.Copilot, services.VoiceInstaller, this);
 
         // A linked module whose game action has no usable key must not fire the key it had before.
-        services.Executor.BlockReason = button => services.ControlSync.StatusOf(button.Id) is BindStatus.NoKey or BindStatus.NotSendable
-            ? "Esa accion no tiene tecla utilizable en el juego. Revisa la seccion Controles."
-            : null;
+        // Only when the player's binds were actually read: without them the status is a guess.
+        Func<DeckButton, string?> block = button =>
+            services.ControlSync.HasGoodRead && services.ControlSync.StatusOf(button.Id) is BindStatus.NoKey or BindStatus.NotSendable
+                ? "Esa accion no tiene tecla utilizable en el juego. Revisa la seccion Controles."
+                : null;
+        services.Executor.BlockReason = block;
+        services.Mobile.BlockReason = block;
         services.Copilot.Changed += (_, _) => IsMuted = services.Copilot.Muted;
         Mobile = new MobileLinkViewModel(services.Session, services.Mobile, this);
         Settings = new SettingsViewModel(services.Session, services.Themes, this, services.OpenDebugConsole);
@@ -277,6 +281,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public async Task ShutdownAsync()
     {
         _refreshTimer?.Dispose();
+        Copilot.CancelAll();
         await Voice.StopCommand.ExecuteAsync(null);
         await Mobile.StopCommand.ExecuteAsync(null);
 

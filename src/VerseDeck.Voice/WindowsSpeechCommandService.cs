@@ -170,7 +170,8 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         }
 
         Diagnostic?.Invoke(this, $"Voice accepted '{e.Result.Text}' confidence={e.Result.Confidence:0.00}");
-        CommandRecognized?.Invoke(this, new VoiceRecognizedEventArgs(match.Command, match.Button, e.Result.Confidence));
+        DateTimeOffset? heardAt = e.Result.Audio is { } audio ? new DateTimeOffset(audio.StartTime) : null;
+        CommandRecognized?.Invoke(this, new VoiceRecognizedEventArgs(match.Command, match.Button, e.Result.Confidence, heardAt));
     }
 
     private void OnSpeechRejected(object? sender, SpeechRecognitionRejectedEventArgs e)

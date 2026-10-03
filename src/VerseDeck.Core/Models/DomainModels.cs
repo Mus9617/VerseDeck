@@ -133,12 +133,16 @@ public interface IVoiceCommandService : IDisposable
 
 public sealed class VoiceRecognizedEventArgs : EventArgs
 {
-    public VoiceRecognizedEventArgs(VoiceCommand command, DeckButton button, double confidence)
+    public VoiceRecognizedEventArgs(VoiceCommand command, DeckButton button, double confidence, DateTimeOffset? heardAt = null)
     {
         Command = command;
         Button = button;
         Confidence = confidence;
+        HeardAt = heardAt;
     }
+
+    /// <summary>When the utterance began, which is earlier than when the recogniser reports it.</summary>
+    public DateTimeOffset? HeardAt { get; }
 
     public VoiceCommand Command { get; }
     public DeckButton Button { get; }

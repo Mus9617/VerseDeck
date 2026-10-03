@@ -26,6 +26,7 @@ public interface IMobileLink
     bool IsRunning { get; }
     string Url { get; }
     int ConnectedCount { get; }
+    Func<DeckButton, string?>? BlockReason { get; set; }
     Task StartAsync(int port, string pin);
     Task StopAsync();
 }
@@ -43,6 +44,12 @@ public sealed class MobileLink : IMobileLink
     public bool IsRunning => _server.IsRunning;
     public string Url { get; private set; } = string.Empty;
     public int ConnectedCount => _server.ConnectedDevices.Count;
+
+    public Func<DeckButton, string?>? BlockReason
+    {
+        get => _server.BlockReason;
+        set => _server.BlockReason = value;
+    }
 
     public async Task StartAsync(int port, string pin)
     {

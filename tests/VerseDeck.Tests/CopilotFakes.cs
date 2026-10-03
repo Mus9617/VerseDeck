@@ -36,6 +36,10 @@ public sealed class FakeTtsEngine : ITtsEngine
         return SpeechFixture.Tone(Seconds);
     }
 
+    public int Unloads { get; private set; }
+
+    public void Unload() => Unloads++;
+
     public void Dispose()
     {
     }
@@ -93,5 +97,6 @@ public sealed class FakeVoiceInstaller : IVoiceInstaller
     {
         Directory.CreateDirectory(store.FolderOf(voice));
         File.WriteAllText(Path.Combine(store.FolderOf(voice), voice.Model), "model");
+        File.WriteAllText(Path.Combine(store.FolderOf(voice), VoiceStore.TokensFile), "tokens");
     }
 }

@@ -159,6 +159,13 @@ public sealed partial class CopilotViewModel : ObservableObject
             return;
         }
 
+        // Two voices can come from the same download; a second copy would overwrite the first mid-install.
+        if (_downloads.Keys.Any(other => other.Voice.Folder == row.Voice.Folder))
+        {
+            _status.Info("Esa voz comparte descarga con otra que ya se esta bajando.");
+            return;
+        }
+
         var cancellation = new CancellationTokenSource();
         _downloads[row] = cancellation;
         row.IsBusy = true;
@@ -203,6 +210,15 @@ public sealed partial class CopilotViewModel : ObservableObject
         Pending = _copilot.WarmUpAsync();
     }
 
+    /// <summary>Stops every download in progress, used when the app closes.</summary>
+    public void CancelAll()
+    {
+        foreach (var cancellation in _downloads.Values.ToList())
+        {
+            cancellation.Cancel();
+        }
+    }
+
     internal void CancelInstall(VoiceRowViewModel row)
     {
         if (_downloads.TryGetValue(row, out var cancellation))
@@ -240,7 +256,7 @@ public sealed partial class CopilotViewModel : ObservableObject
                 CopilotGreeting = Greeting,
                 CopilotVolume = Math.Clamp(Volume, 0, 1),
                 CopilotPack = SelectedPack?.Id ?? _session.Settings.CopilotPack,
-                CopilotMutedCategories = string.Join(",", Categories.Where(c => !c.Speaks).Select(c => c.Name))
+                CopilotMutedCategories = string.Join(",", MutedNames())
             });
             if (warmUp && _copilot.CanSpeak)
             {
@@ -251,6 +267,15 @@ public sealed partial class CopilotViewModel : ObservableObject
         {
             _status.Error(ex.Message);
         }
+    }
+
+    // Categories of other profiles are not on screen; what was muted there stays muted.
+    private IEnumerable<string> MutedNames()
+    {
+        var shown = Categories.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return CopilotService.MutedCategories(_session.Settings)
+            .Where(name => !shown.Contains(name))
+            .Concat(Categories.Where(c => !c.Speaks).Select(c => c.Name));
     }
 
     private void Sync()

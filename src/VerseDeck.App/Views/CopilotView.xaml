@@ -12,7 +12,7 @@
                     <TextBlock Text="CUANDO HABLA" Style="{StaticResource SectionHeader}" Margin="0"/>
                     <TextBlock Text="{Binding Copilot.StatusLine}" Style="{StaticResource H2}" Margin="0,6,0,8"/>
                     <CheckBox Content="Copiloto activado" IsChecked="{Binding Copilot.Enabled}"/>
-                    <CheckBox Content="Contestar solo a los comandos de voz (callar con clics y toques)" IsChecked="{Binding Copilot.VoiceOnly}"/>
+                    <CheckBox Content="Contestar solo a los comandos de voz (callar con los clics)" IsChecked="{Binding Copilot.VoiceOnly}"/>
                     <CheckBox Content="Saludar al arrancar" IsChecked="{Binding Copilot.Greeting}"/>
                     <TextBlock Text="CATEGORIAS QUE CONTESTAN" Style="{StaticResource FieldLabel}" Margin="0,12,0,2"/>
                     <ItemsControl ItemsSource="{Binding Copilot.Categories}" Focusable="False">

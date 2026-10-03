@@ -46,7 +46,14 @@ public sealed class VoiceStore
 
     public string FolderOf(VoiceInfo voice) => Path.Combine(Root, voice.Folder);
 
-    public bool IsInstalled(VoiceInfo voice) => File.Exists(Path.Combine(FolderOf(voice), voice.Model));
+    public const string TokensFile = "tokens.txt";
+
+    /// <summary>True when the files the engine cannot work without are on disk.</summary>
+    public bool IsInstalled(VoiceInfo voice)
+    {
+        var folder = FolderOf(voice);
+        return File.Exists(Path.Combine(folder, voice.Model)) && File.Exists(Path.Combine(folder, TokensFile));
+    }
 }
 
 public sealed record SpeechAudio(float[] Samples, int SampleRate)

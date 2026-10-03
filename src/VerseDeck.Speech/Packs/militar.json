@@ -23,7 +23,7 @@
     "ping": ["Ping lanzado.", "Afirmativo, ping."],
     "mining_mode": ["Minería, recibido."],
     "master_mode": ["Cambio de modo, recibido."],
-    "decoupled": ["Desacoplado, recibido."],
+    "decoupled": ["Acoplamiento, recibido."],
     "cruise": ["Crucero, recibido."],
     "vtol": ["Vertical, recibido."],
     "eject": ["Eyección. Suerte."],

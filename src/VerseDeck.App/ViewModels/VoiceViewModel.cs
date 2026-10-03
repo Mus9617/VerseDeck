@@ -313,9 +313,11 @@ public sealed partial class VoiceViewModel : ObservableObject
             return;
         }
 
-        // In always-listening mode the microphone hears the copilot's own voice.
-        if (_session.Settings.VoiceActivationMode != PushToTalk && _guard.Blocks(now))
+        // The microphone hears the copilot. Anything that began while it was talking is its own voice,
+        // even if the recogniser only reports it afterwards, and must never send a press.
+        if (_guard.Blocks(e.HeardAt ?? now) || _guard.Blocks(now))
         {
+            StatusText = "Ignorado: el copiloto estaba hablando";
             return;
         }
 

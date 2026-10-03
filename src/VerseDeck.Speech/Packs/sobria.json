@@ -23,7 +23,7 @@
     "ping": ["Ping.", "Ping enviado."],
     "mining_mode": ["Modo minería."],
     "master_mode": ["Cambio de modo.", "Modo maestro."],
-    "decoupled": ["Desacoplado.", "Acoplamiento."],
+    "decoupled": ["Acoplamiento.", "Cambio de acoplamiento."],
     "cruise": ["Crucero."],
     "vtol": ["Despegue vertical."],
     "eject": ["Eyección."],

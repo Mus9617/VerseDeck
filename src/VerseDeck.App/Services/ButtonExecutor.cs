@@ -50,7 +50,7 @@ public sealed class ButtonExecutor
         {
             LastError = reason;
             _log.Write($"{source} blocked {button.Name}: {reason}");
-            Blocked?.Invoke(this, args);
+            Raise(Blocked, args);
             return ExecuteResult.Failed;
         }
 
@@ -70,18 +70,52 @@ public sealed class ButtonExecutor
         {
             LastError = ex.Message;
             _log.Write($"{source} failed {button.Name}: {ex}");
-            Failed?.Invoke(this, args);
+            Raise(Failed, args);
             return ExecuteResult.Failed;
         }
 
         LastError = null;
-        if (_settings().CommandSoundEnabled && WillBeAnswered?.Invoke(button, source) != true)
+        if (_settings().CommandSoundEnabled && !Answered(button, source))
         {
             _audio.PlayCommand();
         }
 
-        Sent?.Invoke(this, args);
+        Raise(Sent, args);
         return ExecuteResult.Sent;
+    }
+
+    private bool Answered(DeckButton button, string source)
+    {
+        try
+        {
+            return WillBeAnswered?.Invoke(button, source) == true;
+        }
+        catch (Exception ex)
+        {
+            _log.Write($"WillBeAnswered failed: {ex}");
+            return false;
+        }
+    }
+
+    // What listeners do with a press must never change its outcome, nor stop the other listeners.
+    private void Raise(EventHandler<ExecutedEventArgs>? handlers, ExecutedEventArgs args)
+    {
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler<ExecutedEventArgs>>())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                _log.Write($"A listener of {args.Button.Name} failed: {ex}");
+            }
+        }
     }
 }
 

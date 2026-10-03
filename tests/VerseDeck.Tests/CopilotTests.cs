@@ -369,7 +369,7 @@ public class CopilotServiceTests
     }
 
     [Fact]
-    public async Task WhileSpeaking_PushToTalk_StillAcceptsCommands()
+    public async Task WhileSpeaking_PushToTalk_AlsoIgnoresTheMicrophone()
     {
         await using var h = await EnabledAsync();
         h.Tts.Seconds = 2;
@@ -382,7 +382,7 @@ public class CopilotServiceTests
         h.Voice.Raise(h.Session.VoiceCommands.First(v => v.ButtonId == lights.Id), lights);
         await h.Shell.Voice.Pending;
 
-        Assert.Equal(2, h.Sender.Sent.Count);
+        Assert.Single(h.Sender.Sent);
     }
 
     [Fact]

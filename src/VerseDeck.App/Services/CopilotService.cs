@@ -1,5 +1,5 @@
 using System.IO;
-using System.Media;
+using System.Runtime.InteropServices;
 using VerseDeck.Core.Models;
 using VerseDeck.Speech;
 
@@ -17,30 +17,27 @@ public interface IAudioPlayer
 public sealed class WavAudioPlayer : IAudioPlayer
 {
     private const int HeaderBytes = 44;
+    private const uint Async = 0x0001;
+    private const uint NoDefault = 0x0002;
+    private const uint Memory = 0x0004;
 
     private readonly object _gate = new();
-    private SoundPlayer? _player;
-    private MemoryStream? _stream;
+
+    // Windows reads the sound from this memory until playback ends, so it must stay pinned and referenced.
+    private byte[]? _playing;
 
     public void Play(string wavPath, double volume)
     {
         try
         {
-            var bytes = File.ReadAllBytes(wavPath);
-            var gain = Math.Clamp(volume, 0, 1);
-            for (var i = HeaderBytes; i + 1 < bytes.Length; i += 2)
-            {
-                var sample = (short)(BitConverter.ToInt16(bytes, i) * gain);
-                bytes[i] = (byte)(sample & 0xFF);
-                bytes[i + 1] = (byte)((sample >> 8) & 0xFF);
-            }
-
+            var scaled = Scale(File.ReadAllBytes(wavPath), volume);
+            var pinned = GC.AllocateUninitializedArray<byte>(scaled.Length, pinned: true);
+            scaled.CopyTo(pinned, 0);
             lock (_gate)
             {
-                StopLocked();
-                _stream = new MemoryStream(bytes);
-                _player = new SoundPlayer(_stream);
-                _player.Play();
+                PlaySound(IntPtr.Zero, IntPtr.Zero, 0);
+                _playing = pinned;
+                PlaySound(Marshal.UnsafeAddrOfPinnedArrayElement(pinned, 0), IntPtr.Zero, Async | Memory | NoDefault);
             }
         }
         catch
@@ -51,53 +48,81 @@ public sealed class WavAudioPlayer : IAudioPlayer
 
     public void Stop()
     {
-        lock (_gate)
-        {
-            StopLocked();
-        }
-    }
-
-    private void StopLocked()
-    {
         try
         {
-            _player?.Stop();
-            _player?.Dispose();
-            _stream?.Dispose();
+            lock (_gate)
+            {
+                PlaySound(IntPtr.Zero, IntPtr.Zero, 0);
+                _playing = null;
+            }
         }
         catch
         {
             // Nothing useful can be done about a player that fails to stop.
         }
-
-        _player = null;
-        _stream = null;
     }
+
+    /// <summary>Returns a copy of a 16-bit PCM WAV with its samples multiplied by the volume (0 to 1).</summary>
+    public static byte[] Scale(byte[] wav, double volume)
+    {
+        var result = (byte[])wav.Clone();
+        var gain = Math.Clamp(volume, 0, 1);
+        if (gain >= 1)
+        {
+            return result;
+        }
+
+        for (var i = HeaderBytes; i + 1 < result.Length; i += 2)
+        {
+            var sample = (short)Math.Round(BitConverter.ToInt16(result, i) * gain);
+            result[i] = (byte)(sample & 0xFF);
+            result[i + 1] = (byte)((sample >> 8) & 0xFF);
+        }
+
+        return result;
+    }
+
+    [DllImport("winmm.dll", SetLastError = true)]
+    private static extern bool PlaySound(IntPtr sound, IntPtr module, uint flags);
 }
 
 /// <summary>
-/// While the copilot is talking the microphone hears it, so recognised commands are ignored until it finishes.
+/// The stretch of time during which the copilot is talking. The microphone hears the speakers, so anything
+/// the recogniser heard in that stretch is the copilot's own voice and must never trigger a press.
 /// </summary>
 public sealed class SpeechGuard
 {
     private readonly object _gate = new();
+    private DateTimeOffset _from = DateTimeOffset.MinValue;
     private DateTimeOffset _until = DateTimeOffset.MinValue;
 
-    public void BlockUntil(DateTimeOffset until)
+    public void Speaking(DateTimeOffset from, DateTimeOffset until)
     {
         lock (_gate)
         {
+            // A phrase that interrupts another continues the same stretch rather than starting a new one.
+            if (from >= _until)
+            {
+                _from = from;
+            }
+
             _until = until;
         }
     }
 
-    public void Clear() => BlockUntil(DateTimeOffset.MinValue);
-
-    public bool Blocks(DateTimeOffset now)
+    public void Clear()
     {
         lock (_gate)
         {
-            return now < _until;
+            _from = _until = DateTimeOffset.MinValue;
+        }
+    }
+
+    public bool Blocks(DateTimeOffset at)
+    {
+        lock (_gate)
+        {
+            return at >= _from && at < _until;
         }
     }
 }
@@ -110,8 +135,11 @@ public sealed class CopilotService
 {
     public const string TestPhrase = "Hola, comandante. Esta es mi voz.";
 
-    // The microphone keeps hearing the room for a moment after playback ends.
-    private static readonly TimeSpan EchoMargin = TimeSpan.FromMilliseconds(300);
+    // The room keeps echoing, and the recogniser keeps listening, for a moment after playback ends.
+    private static readonly TimeSpan EchoMargin = TimeSpan.FromMilliseconds(500);
+
+    // An answer that arrives this long after the action is confusing; it is cached for next time instead.
+    private static readonly TimeSpan TooLate = TimeSpan.FromSeconds(2);
 
     private readonly DeckSession _session;
     private readonly ITtsEngine _engine;
@@ -128,6 +156,7 @@ public sealed class CopilotService
     private long? _lastProfileId;
     private int _sequence;
     private bool _muted;
+    private CancellationTokenSource? _saying;
     private CancellationTokenSource? _warmUp;
 
     public CopilotService(
@@ -157,9 +186,9 @@ public sealed class CopilotService
         _selector = new ResponseSelector(packs[0], new Random());
 
         executor.WillBeAnswered = WillAnswer;
-        executor.Sent += (_, e) => OnSent(e);
-        executor.Failed += (_, _) => SayIfSpeaking(() => _selector.Failed());
-        executor.Blocked += (_, _) => SayIfSpeaking(() => _selector.NoKey());
+        executor.Sent += (_, e) => Answer(e, () => _selector.ForModule(e.Button));
+        executor.Failed += (_, e) => Answer(e, () => _selector.Failed());
+        executor.Blocked += (_, e) => Answer(e, () => _selector.NoKey());
         _session.Changed += (_, _) => OnSessionChanged();
     }
 
@@ -207,6 +236,7 @@ public sealed class CopilotService
 
     public bool CanSpeak => _session.Settings.CopilotEnabled && !Muted && ActiveVoice is not null;
 
+    /// <summary>Whether the switches allow the copilot to say anything about this module triggered from this source.</summary>
     public bool WillAnswer(DeckButton button, string source)
     {
         var settings = _session.Settings;
@@ -245,15 +275,18 @@ public sealed class CopilotService
             return;
         }
 
-        // Only the most recent phrase may sound: a slow synthesis for an older command is dropped.
+        // Only the most recent phrase may sound. An older one still being synthesized is abandoned.
         var mine = Interlocked.Increment(ref _sequence);
+        var cancellation = new CancellationTokenSource();
+        Interlocked.Exchange(ref _saying, cancellation)?.Cancel();
+        var asked = _clock();
         try
         {
             var phrase = _cache.TryGet(voice, text);
             var source = phrase is null ? "generated" : "cache";
             if (phrase is null)
             {
-                var audio = await _engine.SynthesizeAsync(voice, text, CancellationToken.None);
+                var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
                 phrase = _cache.Store(voice, text, audio);
             }
 
@@ -262,9 +295,20 @@ public sealed class CopilotService
                 return;
             }
 
+            var now = _clock();
+            if (now - asked > TooLate)
+            {
+                _log.Write($"Copilot kept '{text}' for next time: it was ready {(now - asked).TotalSeconds:0.0} s after the action");
+                return;
+            }
+
             _player.Play(phrase.Path, _session.Settings.CopilotVolume);
+            _guard.Speaking(now, now + phrase.Duration + EchoMargin);
             _log.Write($"Copilot said '{text}' ({source})");
-            _guard.BlockUntil(_clock() + phrase.Duration + EchoMargin);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer phrase or the mute switch took over.
         }
         catch (Exception ex)
         {
@@ -284,28 +328,44 @@ public sealed class CopilotService
         _warmUp?.Cancel();
         var cancellation = _warmUp = new CancellationTokenSource();
         UseCurrentPack();
-        var missing = _selector.AllFor(_session.Buttons).Where(text => _cache.TryGet(voice, text) is null).ToList();
-        try
+        var wanted = _selector.AllFor(_session.Buttons);
+        var missing = wanted.Count(text => _cache.TryGet(voice, text) is null);
+        var done = 0;
+        foreach (var text in wanted)
         {
-            for (var i = 0; i < missing.Count && !cancellation.IsCancellationRequested; i++)
+            if (cancellation.IsCancellationRequested)
             {
-                WarmUpStatus = $"Generando frases: {i + 1} de {missing.Count}";
-                Changed?.Invoke(this, EventArgs.Empty);
-                var audio = await _engine.SynthesizeAsync(voice, missing[i], cancellation.Token);
-                _cache.Store(voice, missing[i], audio);
+                break;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // Superseded by a newer warm-up after the voice or the personality changed.
-        }
-        catch (Exception ex)
-        {
-            _log.Write($"Copilot warm-up stopped: {ex.Message}");
+
+            // Checked again here: a press may have cached the phrase while the warm-up was running.
+            if (_cache.TryGet(voice, text) is not null)
+            {
+                continue;
+            }
+
+            WarmUpStatus = $"Generando frases: {++done} de {missing}";
+            Changed?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
+                _cache.Store(voice, text, audio);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _log.Write($"Copilot warm-up stopped at '{text}': {ex.Message}");
+                break;
+            }
         }
 
         if (ReferenceEquals(_warmUp, cancellation))
         {
+            // Everything the deck can say is on disk now; the model would only hold memory next to the game.
+            _engine.Unload();
             WarmUpStatus = string.Empty;
             Changed?.Invoke(this, EventArgs.Empty);
         }
@@ -319,7 +379,7 @@ public sealed class CopilotService
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnSent(ExecutedEventArgs e)
+    private void Answer(ExecutedEventArgs e, Func<string?> phrase)
     {
         if (!WillAnswer(e.Button, e.Source))
         {
@@ -327,18 +387,9 @@ public sealed class CopilotService
         }
 
         UseCurrentPack();
-        if (_selector.ForModule(e.Button) is { } phrase)
+        if (phrase() is { } text)
         {
-            Pending = SayAsync(phrase);
-        }
-    }
-
-    private void SayIfSpeaking(Func<string> phrase)
-    {
-        if (CanSpeak)
-        {
-            UseCurrentPack();
-            Pending = SayAsync(phrase());
+            Pending = SayAsync(text);
         }
     }
 
@@ -346,7 +397,9 @@ public sealed class CopilotService
     {
         UseCurrentPack();
         var profile = _session.ActiveProfile;
-        if (_lastProfileId is not null && profile is not null && profile.Id != _lastProfileId && CanSpeak)
+
+        // Profiles are switched by clicking, so "voice commands only" keeps this quiet too.
+        if (_lastProfileId is not null && profile is not null && profile.Id != _lastProfileId && CanSpeak && !_session.Settings.CopilotVoiceOnly)
         {
             Pending = SayAsync(_selector.Profile(profile.Name));
         }
@@ -372,6 +425,7 @@ public sealed class CopilotService
     private void Silence()
     {
         Interlocked.Increment(ref _sequence);
+        Interlocked.Exchange(ref _saying, null)?.Cancel();
         _player.Stop();
         _guard.Clear();
     }

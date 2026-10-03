@@ -32,6 +32,9 @@ public sealed class MobilePanelServer : IAsyncDisposable
     public IReadOnlyCollection<ConnectedDevice> ConnectedDevices => _devices.Values.ToList();
     public event EventHandler<string>? Diagnostic;
 
+    /// <summary>Returns why a module must not be sent right now, or null to let it through.</summary>
+    public Func<DeckButton, string?>? BlockReason { get; set; }
+
     public async Task StartAsync(int port, string pairingPin, CancellationToken cancellationToken = default)
     {
         if (_host is not null)
@@ -243,6 +246,12 @@ public sealed class MobilePanelServer : IAsyncDisposable
         var profile = (await _repository.GetProfilesAsync(cancellationToken)).First(p => p.IsActive);
         var button = (await _repository.GetButtonsAsync(profile.Id, cancellationToken)).FirstOrDefault(b => b.Id == buttonId)
             ?? throw new InvalidOperationException("Modulo no encontrado");
+        if (BlockReason?.Invoke(button) is { } reason)
+        {
+            await _repository.AddCommandLogAsync("Mobile", button.Name, $"Blocked: {reason}", cancellationToken);
+            throw new InvalidOperationException(reason);
+        }
+
         if (button.RequiresConfirmation && !confirmed)
         {
             await _repository.AddCommandLogAsync("Mobile", button.Name, "Rejected: confirmation required", cancellationToken);

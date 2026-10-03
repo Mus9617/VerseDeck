@@ -177,7 +177,8 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
-        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) || IsLinked ? "F13" : Key, ManualPressMs, out var action))
+        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) || IsLinked ? "F13" : Key, ManualPressMs, out var action)
+            || !TryReadResponse(out var response))
         {
             return;
         }
@@ -194,7 +195,8 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
                 action,
                 RequiresConfirmation,
                 true,
-                SelectedGameAction?.Id ?? string.Empty));
+                SelectedGameAction?.Id ?? string.Empty,
+                response));
             await _controls.Pending;
             RequestSelect?.Invoke(created.Id);
             _status.Info($"Modulo creado: {created.Name}");
@@ -278,7 +280,8 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
         else if (SelectedResponseMode == ResponseCustom)
         {
             response = ResponseText.Trim();
-            if (response.Length == 0 || response == Speech.ResponseSelector.Silent)
+            var hasVariant = response.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length > 0;
+            if (!hasVariant || response == Speech.ResponseSelector.Silent)
             {
                 _status.Error("Escribe lo que debe decir el copiloto, o elige otra opcion de respuesta.");
                 return false;

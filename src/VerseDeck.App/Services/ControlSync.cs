@@ -77,6 +77,9 @@ public sealed class ControlSync
     public GameInstall? Install { get; private set; }
     public string FileStatus { get; private set; } = "Sin leer";
     public bool Failed { get; private set; }
+
+    /// <summary>False until the player's binds have been read once; statuses mean nothing before that.</summary>
+    public bool HasGoodRead => _hasGoodRead;
     public IReadOnlyList<GameRebind> Rebinds { get; private set; } = [];
     public IReadOnlyList<ModuleLink> Links { get; private set; } = [];
 
