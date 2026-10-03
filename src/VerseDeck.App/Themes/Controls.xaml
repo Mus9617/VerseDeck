@@ -168,6 +168,15 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid Background="Transparent">
+                        <!-- Neon halo next to the marker; it breathes only while AnimationsActive. -->
+                        <Rectangle x:Name="Halo" Width="22" HorizontalAlignment="Left" Fill="{DynamicResource Glow}" Opacity="0" IsHitTestVisible="False">
+                            <Rectangle.OpacityMask>
+                                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                    <GradientStop Color="#99000000" Offset="0"/>
+                                    <GradientStop Color="#00000000" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Rectangle.OpacityMask>
+                        </Rectangle>
                         <Border x:Name="Marker" Width="3" HorizontalAlignment="Left" Background="{DynamicResource Accent}" Visibility="Collapsed"/>
                         <StackPanel VerticalAlignment="Center">
                             <Viewbox Width="22" Height="22">
@@ -190,7 +199,25 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
                             <Setter TargetName="Marker" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Halo" Property="Opacity" Value="0.5"/>
                         </Trigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsChecked, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                <Condition Binding="{Binding AnimationsActive}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <MultiDataTrigger.EnterActions>
+                                <BeginStoryboard x:Name="Breathe">
+                                    <Storyboard Timeline.DesiredFrameRate="20">
+                                        <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                         From="0.25" To="0.95" Duration="0:0:2.4" AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </MultiDataTrigger.EnterActions>
+                            <MultiDataTrigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="Breathe"/>
+                            </MultiDataTrigger.ExitActions>
+                        </MultiDataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

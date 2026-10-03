@@ -55,11 +55,21 @@ public class CallsignTests
     [InlineData("Gatac Syulen", "Syulen")]
     [InlineData("Aegis Avenger Titan", "Avenger Titan")]
     [InlineData("Starter Ship", "Starter Ship")]
+    [InlineData("Consolidated Outland Mustang Alpha", "Mustang Alpha")]
+    [InlineData("Originals Rock", "Originals Rock")]
     [InlineData("  ", "")]
     [InlineData(null, "")]
     public void Callsign_DropsTheMaker(string? ship, string callsign)
     {
         Assert.Equal(callsign, ShipCatalog.Callsign(ship));
+    }
+
+    [Fact]
+    public void ShipList_IsLarge_AndHasNoRepeats()
+    {
+        Assert.True(ShipCatalog.Names.Count > 150);
+        Assert.Equal(ShipCatalog.Names.Count, ShipCatalog.Names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Contains("Gatac Syulen", ShipCatalog.Names);
     }
 
     [Fact]
@@ -148,5 +158,28 @@ public class ControlTowerTests
         var press = Assert.Single(h.Sender.Sent);
         Assert.Equal("N", press.Key);
         Assert.Contains(h.Log.Lines, l => l.Contains("Copilot said") && l.Contains("Syulen"));
+    }
+}
+
+public class AnimationTests
+{
+    [Fact]
+    public async Task Neon_BreathesOnlyWhileTheWindowIsInFront_AndTheSettingIsOn()
+    {
+        await using var h = await Harness.CreateAsync();
+        Assert.True(h.Shell.AnimationsActive);
+
+        h.Shell.IsWindowActive = false;
+        Assert.False(h.Shell.AnimationsActive);
+
+        h.Shell.IsWindowActive = true;
+        h.Shell.IsMinimized = true;
+        Assert.False(h.Shell.AnimationsActive);
+
+        h.Shell.IsMinimized = false;
+        h.Shell.Settings.Animations = false;
+        await h.Shell.Settings.Pending;
+        Assert.False(h.Shell.AnimationsActive);
+        Assert.False(h.Session.Settings.Animations);
     }
 }

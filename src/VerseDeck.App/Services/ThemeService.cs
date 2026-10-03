@@ -1,6 +1,7 @@
 namespace VerseDeck.App.Services;
 
-public enum ThemeId { Neutral, Drake, Origin, Aegis, Anvil }
+// Named as the ship makers write themselves, so "RSI Constellation" finds RSI.
+public enum ThemeId { Neutral, Drake, Origin, Aegis, Anvil, Gatac, RSI, MISC, Crusader, Esperia, Banu }
 
 public sealed class ThemeService
 {

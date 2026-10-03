@@ -58,7 +58,8 @@ public sealed record AppSettings(
     double CopilotVolume = 0.8,
     bool CopilotVoiceOnly = false,
     string CopilotMutedCategories = "",
-    bool CopilotGreeting = false);
+    bool CopilotGreeting = false,
+    bool Animations = true);
 
 public sealed record KeyPressAction(string Key, IReadOnlyList<string> Modifiers, int PressDurationMs)
 {

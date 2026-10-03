@@ -99,6 +99,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _theme = ThemeService.Auto;
 
+    [ObservableProperty]
+    private bool _animations = true;
+
     public SettingsViewModel(DeckSession session, ThemeService themes, IStatusSink status, Action openDebugConsole)
     {
         _session = session;
@@ -122,6 +125,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnThemeChanged(string value) => QueueSave();
 
+    partial void OnAnimationsChanged(bool value) => QueueSave();
+
     private void QueueSave()
     {
         if (!_syncing)
@@ -138,7 +143,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 Theme = Theme ?? ThemeService.Auto,
                 WelcomeSoundEnabled = WelcomeSound,
-                CommandSoundEnabled = CommandSound
+                CommandSoundEnabled = CommandSound,
+                Animations = Animations
             });
         }
         catch (Exception ex)
@@ -155,6 +161,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             var settings = _session.Settings;
             WelcomeSound = settings.WelcomeSoundEnabled;
             CommandSound = settings.CommandSoundEnabled;
+            Animations = settings.Animations;
             Theme = ThemeChoices.FirstOrDefault(c => c.Equals(settings.Theme, StringComparison.OrdinalIgnoreCase)) ?? ThemeService.Auto;
         }
         finally
@@ -346,10 +353,33 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         {
             _isMinimized = value;
             UpdateAboardVisibility();
+            UpdateAnimations();
         }
     }
 
     private bool _isMinimized;
+
+    /// <summary>Set by the window: false while the game, or anything else, has the focus.</summary>
+    public bool IsWindowActive
+    {
+        get => _isWindowActive;
+        set
+        {
+            _isWindowActive = value;
+            UpdateAnimations();
+        }
+    }
+
+    private bool _isWindowActive = true;
+
+    /// <summary>
+    /// Whether the neon breathes. It stops completely, not just hides, while the player is in the game:
+    /// a running animation keeps the render loop busy even when nobody looks at it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _animationsActive;
+
+    private void UpdateAnimations() => AnimationsActive = _services.Session.Settings.Animations && _isWindowActive && !_isMinimized;
 
     // The countdown only ticks while its section is on screen.
     partial void OnSectionChanged(string value) => UpdateAboardVisibility();
@@ -374,6 +404,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         ProfileTitle = (profile?.Name ?? string.Empty).ToUpperInvariant();
         ShipTitle = (profile?.ShipName ?? string.Empty).ToUpperInvariant();
         _services.Themes.Update(_services.Session.Settings.Theme, profile?.ShipName);
+        UpdateAnimations();
         _ = Activity.RefreshAsync();
     }
 

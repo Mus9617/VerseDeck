@@ -80,6 +80,37 @@
             </Grid>
         </Border>
 
+        <!-- Neon strip under the header, fading at both ends; it breathes with the rail marker. -->
+        <Rectangle Grid.Row="0" Height="2" VerticalAlignment="Bottom" Fill="{DynamicResource Glow}" IsHitTestVisible="False">
+            <Rectangle.OpacityMask>
+                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                    <GradientStop Color="#00000000" Offset="0"/>
+                    <GradientStop Color="#FF000000" Offset="0.25"/>
+                    <GradientStop Color="#FF000000" Offset="0.75"/>
+                    <GradientStop Color="#00000000" Offset="1"/>
+                </LinearGradientBrush>
+            </Rectangle.OpacityMask>
+            <Rectangle.Style>
+                <Style TargetType="Rectangle">
+                    <Setter Property="Opacity" Value="0.35"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding AnimationsActive}" Value="True">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard x:Name="StripBreathe">
+                                    <Storyboard Timeline.DesiredFrameRate="20">
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.2" To="0.9" Duration="0:0:2.4" AutoReverse="True" RepeatBehavior="Forever"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="StripBreathe"/>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Rectangle.Style>
+        </Rectangle>
+
         <!-- Rail + section -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>

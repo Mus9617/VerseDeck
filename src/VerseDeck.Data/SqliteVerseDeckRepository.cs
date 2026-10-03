@@ -151,7 +151,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
             ParseVolume(values.GetValueOrDefault("CopilotVolume", "0.80")),
             bool.Parse(values.GetValueOrDefault("CopilotVoiceOnly", "False")),
             values.GetValueOrDefault("CopilotMutedCategories", string.Empty),
-            bool.Parse(values.GetValueOrDefault("CopilotGreeting", "False")));
+            bool.Parse(values.GetValueOrDefault("CopilotGreeting", "False")),
+            bool.Parse(values.GetValueOrDefault("Animations", "True")));
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -175,6 +176,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await UpsertSetting(connection, "CopilotVoiceOnly", settings.CopilotVoiceOnly.ToString(), cancellationToken);
         await UpsertSetting(connection, "CopilotMutedCategories", settings.CopilotMutedCategories, cancellationToken);
         await UpsertSetting(connection, "CopilotGreeting", settings.CopilotGreeting.ToString(), cancellationToken);
+        await UpsertSetting(connection, "Animations", settings.Animations.ToString(), cancellationToken);
     }
 
     public async Task<IReadOnlyList<Profile>> GetProfilesAsync(CancellationToken cancellationToken = default)

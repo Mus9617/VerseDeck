@@ -7,7 +7,7 @@ namespace VerseDeck.Tests;
 
 public class ThemeResourceTests
 {
-    private static readonly string[] BrushKeys = ["Bg", "Surface", "SurfaceRaised", "Line", "Text", "TextMuted", "Accent", "OnAccent", "Positive", "Danger", "Warning"];
+    private static readonly string[] BrushKeys = ["Bg", "Surface", "SurfaceRaised", "Line", "Text", "TextMuted", "Accent", "OnAccent", "Positive", "Danger", "Warning", "Glow"];
     private static readonly string[] FontKeys = ["HeadingFont", "BodyFont", "MonoFont"];
 
     public static IEnumerable<object[]> Themes => Enum.GetNames<ThemeId>().Select(name => new object[] { name });

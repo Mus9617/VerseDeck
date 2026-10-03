@@ -19,6 +19,8 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await _shell.InitializeAsync();
         Closing += OnClosing;
         StateChanged += (_, _) => _shell.IsMinimized = WindowState == WindowState.Minimized;
+        Activated += (_, _) => _shell.IsWindowActive = true;
+        Deactivated += (_, _) => _shell.IsWindowActive = false;
     }
 
     private async void OnClosing(object? sender, CancelEventArgs e)
