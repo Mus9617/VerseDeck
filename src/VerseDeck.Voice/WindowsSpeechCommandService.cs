@@ -12,6 +12,7 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
 
     public event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
     public event EventHandler<string>? Diagnostic;
+    public event EventHandler<RecognitionHeard>? Heard;
     public bool IsRunning => _engines.Count > 0;
     public bool IsListening => _isListening;
     public bool IsInputGateOpen => DateTimeOffset.Now <= _gateOpenUntil;
@@ -52,7 +53,7 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             return Task.CompletedTask;
         }
 
-        var recognizers = SelectRecognizers().ToList();
+        var recognizers = CommandGrammar.Recognizers().ToList();
         Diagnostic?.Invoke(this, $"Installed recognizers: {string.Join(", ", SpeechRecognitionEngine.InstalledRecognizers().Select(r => $"{r.Culture.Name}/{r.Description}"))}");
         Diagnostic?.Invoke(this, $"Selected recognizers: {string.Join(", ", recognizers.Select(r => $"{r.Culture.Name}/{r.Description}"))}");
 
@@ -61,12 +62,7 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             try
             {
                 var engine = new SpeechRecognitionEngine(recognizer);
-                var choices = new Choices(_commands.Keys.ToArray());
-                var grammar = new Grammar(new GrammarBuilder(choices) { Culture = engine.RecognizerInfo.Culture })
-                {
-                    Name = $"VerseDeck {engine.RecognizerInfo.Culture.Name}"
-                };
-                engine.LoadGrammar(grammar);
+                CommandGrammar.Load(engine, _commands.Keys);
                 engine.SpeechDetected += (_, _) => Diagnostic?.Invoke(this, $"Voice speech detected by {engine.RecognizerInfo.Culture.Name}");
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
@@ -151,25 +147,18 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
 
     private void OnSpeechRecognized(object? sender, SpeechRecognizedEventArgs e)
     {
-        if (!IsInputGateOpen)
+        var text = e.Result.Text;
+        var confidence = e.Result.Confidence;
+        var known = _commands.TryGetValue(text, out var match);
+        var rejected = RecognitionRules.Classify(e.Result.Grammar?.Name, confidence, known ? match.Command.MinimumConfidence : 1, known, IsInputGateOpen);
+        if (rejected is { } outcome)
         {
-            Diagnostic?.Invoke(this, $"Voice heard while PTT closed: '{e.Result.Text}' confidence={e.Result.Confidence:0.00}");
+            Diagnostic?.Invoke(this, $"Voice {outcome} '{text}' confidence={Invariant.Format(confidence)}");
+            Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
             return;
         }
 
-        if (!_commands.TryGetValue(e.Result.Text, out var match))
-        {
-            Diagnostic?.Invoke(this, $"Voice recognized unknown '{e.Result.Text}' confidence={e.Result.Confidence:0.00}");
-            return;
-        }
-
-        if (e.Result.Confidence < match.Command.MinimumConfidence)
-        {
-            Diagnostic?.Invoke(this, $"Voice ignored '{e.Result.Text}' confidence={e.Result.Confidence:0.00} minimum={match.Command.MinimumConfidence:0.00}");
-            return;
-        }
-
-        Diagnostic?.Invoke(this, $"Voice accepted '{e.Result.Text}' confidence={e.Result.Confidence:0.00}");
+        Diagnostic?.Invoke(this, $"Voice accepted '{text}' confidence={Invariant.Format(confidence)}");
         DateTimeOffset? heardAt = e.Result.Audio is { } audio ? new DateTimeOffset(audio.StartTime) : null;
         CommandRecognized?.Invoke(this, new VoiceRecognizedEventArgs(match.Command, match.Button, e.Result.Confidence, heardAt));
     }
@@ -180,22 +169,4 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         Diagnostic?.Invoke(this, $"Voice rejected. Alternates: {alternates}");
     }
 
-    private static IEnumerable<RecognizerInfo> SelectRecognizers()
-    {
-        var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
-        var selected = recognizers
-            .Where(r => r.Culture.Name.Equals("es-ES", StringComparison.OrdinalIgnoreCase))
-            .Concat(recognizers.Where(r => r.Culture.TwoLetterISOLanguageName == "es" && !r.Culture.Name.Equals("es-ES", StringComparison.OrdinalIgnoreCase)))
-            .Concat(recognizers.Where(r => r.Culture.Name.Equals("en-US", StringComparison.OrdinalIgnoreCase) || r.Culture.Name.Equals("en-GB", StringComparison.OrdinalIgnoreCase)))
-            .Concat(recognizers.Where(r => r.Culture.TwoLetterISOLanguageName == "en"))
-            .DistinctBy(r => r.Id)
-            .ToList();
-
-        if (selected.Count > 0)
-        {
-            return selected;
-        }
-
-        return recognizers.Take(1);
-    }
 }

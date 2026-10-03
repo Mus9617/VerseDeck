@@ -84,7 +84,8 @@ public partial class App : Application
             copilot,
             speechGuard,
             voiceInstaller,
-            DrainInput: inputSender.WhenIdleAsync));
+            DrainInput: inputSender.WhenIdleAsync,
+            PhraseChecker: new WindowsPhraseChecker()));
     }
 
     private void ApplyTheme(ThemeId theme)

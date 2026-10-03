@@ -371,6 +371,26 @@ public sealed class CopilotService
         }
     }
 
+    /// <summary>Voices whose models are on disk, the chosen one first.</summary>
+    public IReadOnlyList<VoiceInfo> InstalledVoices
+    {
+        get
+        {
+            var active = ActiveVoice;
+            return _voices.Voices.Where(_store.IsInstalled).OrderBy(v => v.Id == active?.Id ? 0 : 1).ToList();
+        }
+    }
+
+    /// <summary>The phrase as audio on disk, generated if needed. Never plays it.</summary>
+    public async Task<CachedPhrase> RenderAsync(VoiceInfo voice, string text, CancellationToken cancellationToken)
+    {
+        return _cache.TryGet(voice, text)
+            ?? _cache.Store(voice, text, await _engine.SynthesizeAsync(voice, text, cancellationToken));
+    }
+
+    /// <summary>Frees the voice model after on-demand work; it is reloaded when next needed.</summary>
+    public void ReleaseEngine() => _engine.Unload();
+
     public void ClearCache()
     {
         _warmUp?.Cancel();

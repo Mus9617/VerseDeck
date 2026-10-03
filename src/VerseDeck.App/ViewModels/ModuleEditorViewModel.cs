@@ -62,6 +62,12 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _responseText = string.Empty;
 
+    [ObservableProperty]
+    private string _phraseTestResult = string.Empty;
+
+    /// <summary>Checks phrases offline with the copilot's voice; set by the shell.</summary>
+    public VoiceDoctor? Doctor { get; set; }
+
     public ModuleEditorViewModel(DeckSession session, IDialogService dialogs, IStatusSink status, ControlSync controls, GameActionCatalog catalog)
     {
         _controls = controls;
@@ -93,6 +99,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     {
         _button = button;
         Phrases.Clear();
+        PhraseTestResult = string.Empty;
         LoadGameActionChoices(button?.GameAction ?? string.Empty);
         if (button is null)
         {
@@ -223,6 +230,27 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             await _session.DeleteButtonAsync(_button.Id);
             _status.Info($"Modulo eliminado: {deletedName}");
         });
+    }
+
+    /// <summary>Speaks the new phrase with the copilot's voice and runs it through the recogniser, without a microphone.</summary>
+    [RelayCommand]
+    private async Task TestPhraseAsync()
+    {
+        if (_button is null || Doctor is null)
+        {
+            _status.Error("Selecciona un modulo.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(NewPhrase))
+        {
+            _status.Error("Escribe la frase que quieres probar.");
+            return;
+        }
+
+        PhraseTestResult = "Comprobando...";
+        var verdict = await Doctor.CheckPhraseAsync(_button.Id, NewPhrase);
+        PhraseTestResult = verdict.Text;
     }
 
     [RelayCommand]

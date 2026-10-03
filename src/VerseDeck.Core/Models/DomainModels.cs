@@ -123,6 +123,9 @@ public interface IVoiceCommandService : IDisposable
 {
     event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
     event EventHandler<string>? Diagnostic;
+
+    /// <summary>Everything the engine heard but did not turn into a command, with the reason.</summary>
+    event EventHandler<RecognitionHeard>? Heard;
     bool IsRunning { get; }
     void PauseRecognition();
     void ResumeRecognition();
@@ -130,6 +133,11 @@ public interface IVoiceCommandService : IDisposable
     Task StartAsync(IReadOnlyList<VoiceCommand> commands, IReadOnlyList<DeckButton> buttons, CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>What happened to something the microphone heard.</summary>
+public enum RecognitionOutcome { Executed, Discarded, LowConfidence, GateClosed, CopilotSpeaking, Repeated, ModuleGone, Offline, Failed }
+
+public sealed record RecognitionHeard(string Text, double Confidence, RecognitionOutcome Outcome, DateTimeOffset At);
 
 public sealed class VoiceRecognizedEventArgs : EventArgs
 {

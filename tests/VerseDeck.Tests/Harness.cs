@@ -56,6 +56,9 @@ public sealed class FakeVoiceService : IVoiceCommandService
 
     public event EventHandler<VoiceRecognizedEventArgs>? CommandRecognized;
     public event EventHandler<string>? Diagnostic;
+    public event EventHandler<RecognitionHeard>? Heard;
+
+    public void RaiseHeard(string text, RecognitionOutcome outcome, double confidence = 0.5) => Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
 
     public Task StartAsync(IReadOnlyList<VoiceCommand> commands, IReadOnlyList<DeckButton> buttons, CancellationToken cancellationToken = default)
     {
@@ -187,6 +190,7 @@ public sealed class Harness : IAsyncDisposable
     public PhraseCache PhraseCache { get; private set; } = null!;
     public FakeVoiceInstaller VoiceInstaller { get; private set; } = null!;
     public CopilotService Copilot { get; private set; } = null!;
+    public FakePhraseChecker Checker { get; private set; } = null!;
     public FakeGameFolder? Game { get; private set; }
     public FakeFileWatch Watch { get; } = new();
     public ControlSync ControlSync { get; private set; } = null!;
@@ -230,6 +234,7 @@ public sealed class Harness : IAsyncDisposable
         var catalog = GameActionCatalog.Load();
         harness.ControlSync = new ControlSync(harness.Session, new GameInstallLocator(launcherLogs, []), catalog, harness.Watch, harness.Ui, harness.Log, () => harness.Now);
         var executor = new ButtonExecutor(harness.Sender, harness.Repository, harness.Dialogs, harness.Audio, harness.Log, () => harness.Session.Settings);
+        harness.Checker = new FakePhraseChecker(harness.PhraseCache, VoiceCatalog.Load().Voices);
         harness.Copilot = new CopilotService(harness.Session, executor, harness.Tts, harness.PhraseCache, harness.Player, VoiceCatalog.Load(), harness.VoiceStore, ResponsePack.LoadAll(), harness.Guard, harness.Log, () => harness.Now);
         harness.Shell = new ShellViewModel(new ShellServices(
             harness.Session,
@@ -254,7 +259,8 @@ public sealed class Harness : IAsyncDisposable
             {
                 harness.InputDrains++;
                 return Task.CompletedTask;
-            }));
+            },
+            harness.Checker));
         if (initialize)
         {
             await harness.Shell.InitializeAsync();

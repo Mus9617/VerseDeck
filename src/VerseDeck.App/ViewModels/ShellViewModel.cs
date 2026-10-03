@@ -183,7 +183,8 @@ public sealed record ShellServices(
     SpeechGuard SpeechGuard,
     IVoiceInstaller VoiceInstaller,
     Func<DateTimeOffset>? Clock = null,
-    Func<Task>? DrainInput = null);
+    Func<Task>? DrainInput = null,
+    VerseDeck.Voice.IPhraseChecker? PhraseChecker = null);
 
 public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 {
@@ -220,6 +221,12 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Activity = new ActivityViewModel(services.Repository);
         Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now), services.SpeechGuard);
         Copilot = new CopilotViewModel(services.Session, services.Copilot, services.VoiceInstaller, this);
+        if (services.PhraseChecker is not null)
+        {
+            var doctor = new VoiceDoctor(services.Session, services.Copilot, services.PhraseChecker, services.Log);
+            Voice.Doctor = doctor;
+            Editor.Doctor = doctor;
+        }
 
         // A linked module whose game action has no usable key must not fire the key it had before.
         // Only when the player's binds were actually read: without them the status is a guess.

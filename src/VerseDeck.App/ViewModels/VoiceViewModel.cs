@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -52,6 +53,14 @@ public sealed partial class VoiceViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDetecting;
 
+    [ObservableProperty]
+    private bool _isChecking;
+
+    [ObservableProperty]
+    private string _checkStatus = string.Empty;
+
+    private CancellationTokenSource? _check;
+
     public VoiceViewModel(DeckSession session, IVoiceCommandService voice, IPttMonitor ptt, ButtonExecutor executor, IStatusSink status, IUiScheduler ui, IDebugLog log, Func<DateTimeOffset> clock, SpeechGuard guard)
     {
         _clock = clock;
@@ -65,6 +74,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         _session.Changed += (_, _) => OnSessionChanged();
         _voice.Diagnostic += (_, message) => log.Write($"Voice: {message}");
         _voice.CommandRecognized += (_, e) => _ui.Post(() => Pending = HandleRecognizedAsync(e));
+        _voice.Heard += (_, heard) => _ui.Post(() => Record(heard.Text, heard.Confidence, heard.Outcome));
         _ptt.PressedChanged += (_, pressed) => _ui.Post(() => OnPttChanged(pressed));
     }
 
@@ -75,6 +85,73 @@ public sealed partial class VoiceViewModel : ObservableObject
     public Task Pending { get; private set; } = Task.CompletedTask;
 
     public Action<long>? RequestSelect { get; set; }
+
+    /// <summary>Checks phrases offline with the copilot's voice; set by the shell.</summary>
+    public VoiceDoctor? Doctor { get; set; }
+
+    public const int HistorySize = 20;
+
+    /// <summary>The last things the microphone heard and what happened to each, newest first.</summary>
+    public ObservableCollection<HistoryRow> History { get; } = [];
+
+    public ObservableCollection<PhraseVerdict> CheckResults { get; } = [];
+
+    [RelayCommand]
+    private async Task CheckAllAsync()
+    {
+        if (Doctor is null)
+        {
+            return;
+        }
+
+        _check?.Cancel();
+        var cancellation = _check = new CancellationTokenSource();
+        IsChecking = true;
+        CheckResults.Clear();
+        CheckStatus = "Comprobando frases...";
+        try
+        {
+            var results = await Doctor.CheckAllAsync(new Progress<string>(text => CheckStatus = text), cancellation.Token);
+            foreach (var verdict in results)
+            {
+                CheckResults.Add(verdict);
+            }
+
+            var problems = results.Count(r => r.Kind != VerdictKind.Ok);
+            CheckStatus = problems == 0
+                ? $"Las {results.Count} frases se entienden bien."
+                : $"{problems} de {results.Count} frases necesitan atencion. Arriba las que se confunden con otro modulo.";
+        }
+        catch (OperationCanceledException)
+        {
+            CheckStatus = "Comprobacion cancelada.";
+        }
+        catch (Exception ex)
+        {
+            CheckStatus = ex.Message;
+            _status.Error(ex.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_check, cancellation))
+            {
+                IsChecking = false;
+                _check = null;
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void CancelCheck() => _check?.Cancel();
+
+    private void Record(string text, double confidence, RecognitionOutcome outcome)
+    {
+        History.Insert(0, new HistoryRow(_clock().ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentCulture), text, confidence, outcome));
+        while (History.Count > HistorySize)
+        {
+            History.RemoveAt(History.Count - 1);
+        }
+    }
 
     public void SyncFromSettings()
     {
@@ -308,8 +385,13 @@ public sealed partial class VoiceViewModel : ObservableObject
         // Never act on a recognition the user cannot see coming: voice off, module gone, or an echo of the last one.
         var now = _clock();
         var button = _session.Buttons.FirstOrDefault(b => b.Id == e.Button.Id);
-        if (State == LinkState.Offline || button is null || now - _lastRecognition < RecognitionDebounce)
+        var ignored = State == LinkState.Offline ? RecognitionOutcome.Offline
+            : button is null ? RecognitionOutcome.ModuleGone
+            : now - _lastRecognition < RecognitionDebounce ? RecognitionOutcome.Repeated
+            : (RecognitionOutcome?)null;
+        if (ignored is { } reason || button is null)
         {
+            Record(e.Command.Phrase, e.Confidence, ignored ?? RecognitionOutcome.ModuleGone);
             return;
         }
 
@@ -318,12 +400,14 @@ public sealed partial class VoiceViewModel : ObservableObject
         if (_guard.Blocks(e.HeardAt ?? now) || _guard.Blocks(now))
         {
             StatusText = "Ignorado: el copiloto estaba hablando";
+            Record(e.Command.Phrase, e.Confidence, RecognitionOutcome.CopilotSpeaking);
             return;
         }
 
         _lastRecognition = now;
         RequestSelect?.Invoke(button.Id);
         var result = await _executor.ExecuteAsync(button, "Voice");
+        Record(e.Command.Phrase, e.Confidence, result == ExecuteResult.Sent ? RecognitionOutcome.Executed : RecognitionOutcome.Failed);
         StatusText = $"Reconocido: {e.Command.Phrase} ({e.Confidence.ToString("0.00", CultureInfo.CurrentCulture)})";
         if (result == ExecuteResult.Sent)
         {
