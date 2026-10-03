@@ -184,7 +184,8 @@ public sealed record ShellServices(
     IVoiceInstaller VoiceInstaller,
     Func<DateTimeOffset>? Clock = null,
     Func<Task>? DrainInput = null,
-    VerseDeck.Voice.IPhraseChecker? PhraseChecker = null);
+    VerseDeck.Voice.IPhraseChecker? PhraseChecker = null,
+    Func<string>? ExportFolder = null);
 
 public sealed partial class ShellViewModel : ObservableObject, IStatusSink
 {
@@ -221,6 +222,20 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         Activity = new ActivityViewModel(services.Repository);
         Voice = new VoiceViewModel(services.Session, services.Voice, services.Ptt, services.Executor, this, services.Ui, services.Log, services.Clock ?? (() => DateTimeOffset.Now), services.SpeechGuard);
         Copilot = new CopilotViewModel(services.Session, services.Copilot, services.VoiceInstaller, this);
+        var clock = services.Clock ?? (() => DateTimeOffset.Now);
+        Checklists = new ChecklistRunner(services.Session, services.Executor, services.Copilot);
+        Timers = new TimerService(services.Ui, clock, services.Copilot, services.Audio);
+        Aboard = new AboardViewModel(
+            services.Session,
+            Checklists,
+            Timers,
+            new LogbookService(services.Repository, services.Session, clock),
+            services.Copilot,
+            services.Ui,
+            clock,
+            this,
+            services.ExportFolder ?? (() => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)));
+        Voice.CompanionHandler = Aboard.HandleAsync;
         if (services.PhraseChecker is not null)
         {
             var doctor = new VoiceDoctor(services.Session, services.Copilot, services.PhraseChecker, services.Log);
@@ -265,6 +280,9 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     public SettingsViewModel Settings { get; }
     public ControlsViewModel Controls { get; }
     public CopilotViewModel Copilot { get; }
+    public AboardViewModel Aboard { get; }
+    public ChecklistRunner Checklists { get; }
+    public TimerService Timers { get; }
 
     /// <summary>The work of the last periodic tick, so tests can wait for it.</summary>
     public Task RefreshTick { get; private set; } = Task.CompletedTask;
@@ -285,6 +303,7 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
             }
 
             await Activity.RefreshAsync();
+            await Aboard.InitializeAsync();
             ScheduleRefresh();
             CopilotStart = _services.Copilot.StartAsync();
             _services.Log.Write("App initialized");
@@ -317,6 +336,9 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
     private void Navigate(string section) => Section = section;
 
     partial void OnIsMutedChanged(bool value) => _services.Copilot.Muted = value;
+
+    // The countdown only ticks while its section is on screen.
+    partial void OnSectionChanged(string value) => Aboard.IsVisible = value == "Abordo";
 
     public void Info(string message)
     {

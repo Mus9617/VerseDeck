@@ -17,6 +17,7 @@ public sealed class DeckSession
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public IReadOnlyList<DeckButton> Buttons { get; private set; } = [];
     public IReadOnlyList<VoiceCommand> VoiceCommands { get; private set; } = [];
+    public IReadOnlyList<Checklist> Checklists { get; private set; } = [];
 
     public event EventHandler? Changed;
 
@@ -34,6 +35,7 @@ public sealed class DeckSession
         Buttons = ActiveProfile is null ? [] : await _repository.GetButtonsAsync(ActiveProfile.Id);
         var buttonIds = Buttons.Select(b => b.Id).ToHashSet();
         VoiceCommands = (await _repository.GetVoiceCommandsAsync()).Where(v => buttonIds.Contains(v.ButtonId)).ToList();
+        Checklists = ActiveProfile is null ? [] : await _repository.GetChecklistsAsync(ActiveProfile.Id);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -68,6 +70,7 @@ public sealed class DeckSession
 
         var sourceButtons = Buttons;
         var sourceVoiceCommands = VoiceCommands;
+        var sourceChecklists = Checklists;
         var existing = Profiles.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         var saved = await _repository.SaveProfileAsync(existing is null
             ? new Profile(0, name, shipName, "General", true)
@@ -76,7 +79,16 @@ public sealed class DeckSession
         // A new profile starts as a copy of the deck that was on screen.
         if (existing is null)
         {
-            await CloneDeckAsync(sourceButtons, sourceVoiceCommands, saved.Id);
+            var clonedIds = await CloneDeckAsync(sourceButtons, sourceVoiceCommands, saved.Id);
+
+            // Checklists come along, pointing at the new profile's copies of their modules.
+            foreach (var checklist in sourceChecklists)
+            {
+                var steps = checklist.Steps
+                    .Select(s => s with { Id = 0, ButtonId = s.ButtonId is { } id && clonedIds.TryGetValue(id, out var cloned) ? cloned : null })
+                    .ToList();
+                await _repository.SaveChecklistAsync(new Checklist(0, saved.Id, checklist.Name, steps));
+            }
         }
 
         await _repository.AddCommandLogAsync("Windows", "Perfil", existing is null ? $"Creado: {saved.Name}" : $"Guardado: {saved.Name}");
@@ -89,6 +101,29 @@ public sealed class DeckSession
         var saved = await _repository.SaveButtonAsync(button);
         await ReloadAsync();
         return saved;
+    }
+
+    public async Task<Checklist> SaveChecklistAsync(Checklist checklist)
+    {
+        if (string.IsNullOrWhiteSpace(checklist.Name))
+        {
+            throw new InvalidOperationException("La checklist necesita un nombre.");
+        }
+
+        if (Checklists.Any(c => c.Id != checklist.Id && c.Name.Equals(checklist.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Ya hay una checklist con ese nombre.");
+        }
+
+        var saved = await _repository.SaveChecklistAsync(checklist with { Name = checklist.Name.Trim(), ProfileId = ActiveProfile?.Id ?? checklist.ProfileId });
+        await ReloadAsync();
+        return saved;
+    }
+
+    public async Task DeleteChecklistAsync(long checklistId)
+    {
+        await _repository.DeleteChecklistAsync(checklistId);
+        await ReloadAsync();
     }
 
     /// <summary>Saves several modules and reloads once, so listeners see a single change.</summary>
@@ -121,7 +156,7 @@ public sealed class DeckSession
         await ReloadAsync();
     }
 
-    private async Task CloneDeckAsync(IReadOnlyList<DeckButton> sourceButtons, IReadOnlyList<VoiceCommand> sourceVoiceCommands, long targetProfileId)
+    private async Task<Dictionary<long, long>> CloneDeckAsync(IReadOnlyList<DeckButton> sourceButtons, IReadOnlyList<VoiceCommand> sourceVoiceCommands, long targetProfileId)
     {
         var clonedIds = new Dictionary<long, long>();
         foreach (var button in sourceButtons)
@@ -137,5 +172,7 @@ public sealed class DeckSession
                 await _repository.SaveVoiceCommandAsync(command with { Id = 0, ButtonId = clonedId });
             }
         }
+
+        return clonedIds;
     }
 }

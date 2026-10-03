@@ -94,6 +94,30 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
         await EnsureColumnAsync(connection, "Buttons", "GameAction", "TEXT NOT NULL DEFAULT ''", cancellationToken);
         await EnsureColumnAsync(connection, "Buttons", "Response", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        var companion = connection.CreateCommand();
+        companion.CommandText = """
+        CREATE TABLE IF NOT EXISTS Checklists (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProfileId INTEGER NOT NULL,
+            Name TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS ChecklistSteps (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ChecklistId INTEGER NOT NULL,
+            Position INTEGER NOT NULL,
+            Text TEXT NOT NULL,
+            ButtonId INTEGER NULL
+        );
+        CREATE TABLE IF NOT EXISTS LogbookNotes (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAt TEXT NOT NULL,
+            ProfileName TEXT NOT NULL,
+            ShipName TEXT NOT NULL,
+            Text TEXT NOT NULL,
+            Source TEXT NOT NULL
+        );
+        """;
+        await companion.ExecuteNonQueryAsync(cancellationToken);
         await EnsureDefaultDeckAsync(connection, cancellationToken);
     }
 
@@ -393,6 +417,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{DefaultDeckSeededKey}'";
         if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
+            await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
             return;
         }
 
@@ -420,6 +445,161 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         }
 
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
+        await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
+    }
+
+    // Two examples, linked to the default modules when they exist. Seeded once; the player owns them after.
+    private static async Task SeedChecklistsOnceAsync(SqliteConnection connection, SqliteVerseDeckRepository repo, long profileId, CancellationToken cancellationToken)
+    {
+        var seeded = connection.CreateCommand();
+        seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{ChecklistsSeededKey}'";
+        if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
+        {
+            return;
+        }
+
+        var buttons = await repo.GetButtonsAsync(profileId, cancellationToken);
+        long? Module(string name) => buttons.FirstOrDefault(b => b.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Id;
+        ChecklistStep Step(int position, string text, string? module) => new(0, position, text, module is null ? null : Module(module));
+
+        await repo.SaveChecklistAsync(new Checklist(0, profileId, "Prevuelo",
+        [
+            Step(1, "Preparar vuelo", "Flight Ready"),
+            Step(2, "Luces", "Lights"),
+            Step(3, "Pedir permiso de despegue", null),
+            Step(4, "Despegar y subir el tren", "Landing Gear")
+        ]), cancellationToken);
+        await repo.SaveChecklistAsync(new Checklist(0, profileId, "Aterrizaje",
+        [
+            Step(1, "Pedir permiso de aterrizaje", null),
+            Step(2, "Bajar el tren", "Landing Gear"),
+            Step(3, "Apagar motores", "Engines Toggle")
+        ]), cancellationToken);
+        await UpsertSetting(connection, ChecklistsSeededKey, "Done", cancellationToken);
+    }
+
+    private const string ChecklistsSeededKey = "ChecklistsSeededV1";
+
+    public async Task<IReadOnlyList<Checklist>> GetChecklistsAsync(long profileId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = """
+        SELECT c.Id, c.Name, s.Id, s.Position, s.Text, s.ButtonId
+        FROM Checklists c LEFT JOIN ChecklistSteps s ON s.ChecklistId = c.Id
+        WHERE c.ProfileId = $profileId
+        ORDER BY c.Name, c.Id, s.Position, s.Id
+        """;
+        command.Parameters.AddWithValue("$profileId", profileId);
+        var rows = new List<(long Id, string Name, ChecklistStep? Step)>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var step = reader.IsDBNull(2)
+                ? null
+                : new ChecklistStep(reader.GetInt64(2), reader.GetInt32(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetInt64(5));
+            rows.Add((reader.GetInt64(0), reader.GetString(1), step));
+        }
+
+        return rows
+            .GroupBy(r => (r.Id, r.Name))
+            .Select(g => new Checklist(g.Key.Id, profileId, g.Key.Name, g.Where(r => r.Step is not null).Select(r => r.Step!).ToList()))
+            .ToList();
+    }
+
+    public async Task<Checklist> SaveChecklistAsync(Checklist checklist, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        var save = connection.CreateCommand();
+        save.Transaction = transaction;
+        if (checklist.Id == 0)
+        {
+            save.CommandText = "INSERT INTO Checklists (ProfileId, Name) VALUES ($profileId, $name); SELECT last_insert_rowid();";
+        }
+        else
+        {
+            save.CommandText = "UPDATE Checklists SET ProfileId=$profileId, Name=$name WHERE Id=$id; SELECT $id;";
+            save.Parameters.AddWithValue("$id", checklist.Id);
+        }
+
+        save.Parameters.AddWithValue("$profileId", checklist.ProfileId);
+        save.Parameters.AddWithValue("$name", checklist.Name.Trim());
+        var id = (long)(await save.ExecuteScalarAsync(cancellationToken) ?? checklist.Id);
+
+        // Steps are few and edited together, so they are replaced as a whole.
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM ChecklistSteps WHERE ChecklistId=$id";
+        clear.Parameters.AddWithValue("$id", id);
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        var steps = new List<ChecklistStep>();
+        var position = 1;
+        foreach (var step in checklist.Steps.Where(s => !string.IsNullOrWhiteSpace(s.Text)))
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT INTO ChecklistSteps (ChecklistId, Position, Text, ButtonId) VALUES ($id, $position, $text, $button); SELECT last_insert_rowid();";
+            insert.Parameters.AddWithValue("$id", id);
+            insert.Parameters.AddWithValue("$position", position);
+            insert.Parameters.AddWithValue("$text", step.Text.Trim());
+            insert.Parameters.AddWithValue("$button", step.ButtonId is { } button ? button : DBNull.Value);
+            var stepId = (long)(await insert.ExecuteScalarAsync(cancellationToken) ?? 0L);
+            steps.Add(step with { Id = stepId, Position = position, Text = step.Text.Trim() });
+            position++;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return checklist with { Id = id, Name = checklist.Name.Trim(), Steps = steps };
+    }
+
+    public async Task DeleteChecklistAsync(long checklistId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM ChecklistSteps WHERE ChecklistId=$id; DELETE FROM Checklists WHERE Id=$id;";
+        command.Parameters.AddWithValue("$id", checklistId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<LogbookNote> AddNoteAsync(LogbookNote note, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO LogbookNotes (CreatedAt, ProfileName, ShipName, Text, Source) VALUES ($created, $profile, $ship, $text, $source); SELECT last_insert_rowid();";
+        command.Parameters.AddWithValue("$created", note.CreatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$profile", note.ProfileName);
+        command.Parameters.AddWithValue("$ship", note.ShipName);
+        command.Parameters.AddWithValue("$text", note.Text);
+        command.Parameters.AddWithValue("$source", note.Source);
+        var id = (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+        return note with { Id = id };
+    }
+
+    public async Task<IReadOnlyList<LogbookNote>> GetNotesAsync(int count, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, CreatedAt, ProfileName, ShipName, Text, Source FROM LogbookNotes ORDER BY Id DESC LIMIT $count";
+        command.Parameters.AddWithValue("$count", count);
+        var notes = new List<LogbookNote>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            notes.Add(new LogbookNote(reader.GetInt64(0), DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5)));
+        }
+
+        return notes;
+    }
+
+    public async Task DeleteNoteAsync(long noteId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM LogbookNotes WHERE Id=$id";
+        command.Parameters.AddWithValue("$id", noteId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static double ParseVolume(string text)

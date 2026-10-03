@@ -112,6 +112,12 @@ public interface IVerseDeckRepository
     Task<VoiceCommand> SaveVoiceCommandAsync(VoiceCommand command, CancellationToken cancellationToken = default);
     Task AddCommandLogAsync(string source, string command, string result, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CommandLogEntry>> GetRecentCommandLogAsync(int count, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Checklist>> GetChecklistsAsync(long profileId, CancellationToken cancellationToken = default);
+    Task<Checklist> SaveChecklistAsync(Checklist checklist, CancellationToken cancellationToken = default);
+    Task DeleteChecklistAsync(long checklistId, CancellationToken cancellationToken = default);
+    Task<LogbookNote> AddNoteAsync(LogbookNote note, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LogbookNote>> GetNotesAsync(int count, CancellationToken cancellationToken = default);
+    Task DeleteNoteAsync(long noteId, CancellationToken cancellationToken = default);
 }
 
 public interface IInputSender
@@ -133,6 +139,15 @@ public interface IVoiceCommandService : IDisposable
     /// Applied on the next start.
     /// </summary>
     bool UseDiscardModel { get; set; }
+
+    /// <summary>Checklist names the companion grammar listens for. Applied on the next start.</summary>
+    IReadOnlyList<string> ChecklistNames { get; set; }
+
+    /// <summary>Minimum confidence for checklist, timer and note phrases.</summary>
+    double CompanionMinimumConfidence { get; set; }
+
+    /// <summary>A checklist, timer or note phrase was heard.</summary>
+    event EventHandler<CompanionRecognizedEventArgs>? CompanionRecognized;
     bool IsRunning { get; }
     void PauseRecognition();
     void ResumeRecognition();
@@ -153,7 +168,9 @@ public sealed record Checklist(long Id, long ProfileId, string Name, IReadOnlyLi
 public sealed record LogbookNote(long Id, DateTimeOffset CreatedAt, string ProfileName, string ShipName, string Text, string Source);
 
 /// <summary>What happened to something the microphone heard.</summary>
-public enum RecognitionOutcome { Executed, Discarded, LowConfidence, GateClosed, CopilotSpeaking, Repeated, ModuleGone, Offline, Failed }
+public enum RecognitionOutcome { Executed, Discarded, LowConfidence, GateClosed, CopilotSpeaking, Repeated, ModuleGone, Offline, Failed, NothingToDo }
+
+public sealed record CompanionRecognizedEventArgs(CompanionCommand Command, string Text, double Confidence, DateTimeOffset? HeardAt);
 
 public sealed record RecognitionHeard(string Text, double Confidence, RecognitionOutcome Outcome, DateTimeOffset At);
 

@@ -58,6 +58,15 @@ public sealed class FakeVoiceService : IVoiceCommandService
     public event EventHandler<string>? Diagnostic;
     public event EventHandler<RecognitionHeard>? Heard;
     public bool UseDiscardModel { get; set; }
+    public IReadOnlyList<string> ChecklistNames { get; set; } = [];
+    public double CompanionMinimumConfidence { get; set; }
+    public event EventHandler<CompanionRecognizedEventArgs>? CompanionRecognized;
+
+    public void RaiseCompanion(string text, DateTimeOffset? heardAt = null)
+    {
+        var command = VerseDeck.Voice.CompanionParser.Parse(text) ?? throw new ArgumentException(text);
+        CompanionRecognized?.Invoke(this, new CompanionRecognizedEventArgs(command, text, 0.8, heardAt));
+    }
 
     public void RaiseHeard(string text, RecognitionOutcome outcome, double confidence = 0.5) => Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
 
@@ -261,7 +270,8 @@ public sealed class Harness : IAsyncDisposable
                 harness.InputDrains++;
                 return Task.CompletedTask;
             },
-            harness.Checker));
+            harness.Checker,
+            () => Path.Combine(harness.SpeechRoot, "export")));
         if (initialize)
         {
             await harness.Shell.InitializeAsync();

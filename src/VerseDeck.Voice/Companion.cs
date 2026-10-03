@@ -20,7 +20,7 @@ public static class SpanishNumbers
         var lookup = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (words, value) in AllWords())
         {
-            lookup[Text.Normalize(words)] = value;
+            lookup[SpeechText.Normalize(words)] = value;
         }
 
         return lookup;
@@ -68,11 +68,11 @@ public static class SpanishNumbers
         yield return ("una", 1);
     }
 
-    public static bool TryParse(string words, out int value) => Lookup.Value.TryGetValue(Text.Normalize(words), out value);
+    public static bool TryParse(string words, out int value) => Lookup.Value.TryGetValue(SpeechText.Normalize(words), out value);
 }
 
 /// <summary>Accent- and punctuation-insensitive text for matching what the recogniser returns.</summary>
-internal static class Text
+public static class SpeechText
 {
     public static string Normalize(string text)
     {
@@ -152,12 +152,12 @@ public static class CompanionGrammar
 
 public static class CompanionParser
 {
-    private static readonly Dictionary<string, string> Labels = CompanionGrammar.TimerLabels.ToDictionary(Text.Normalize, label => label);
+    private static readonly Dictionary<string, string> Labels = CompanionGrammar.TimerLabels.ToDictionary(SpeechText.Normalize, label => label);
 
     /// <summary>What a recognised companion phrase asks for, or null when it does not make sense.</summary>
     public static CompanionCommand? Parse(string recognized)
     {
-        var text = Text.Normalize(recognized);
+        var text = SpeechText.Normalize(recognized);
         switch (text)
         {
             case "hecho" or "siguiente" or "listo":
