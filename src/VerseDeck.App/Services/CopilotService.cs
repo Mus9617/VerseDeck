@@ -435,7 +435,14 @@ public sealed class CopilotService
 
     private void OnSessionChanged()
     {
+        var callsign = _selector.Callsign;
         UseCurrentPack();
+
+        // Another ship means other words in the control tower phrases: render them before they are needed.
+        if (callsign.Length > 0 && callsign != _selector.Callsign && CanSpeak)
+        {
+            _ = WarmUpAsync();
+        }
         var profile = _session.ActiveProfile;
 
         // Profiles are switched by clicking, so "voice commands only" keeps this quiet too.
@@ -479,6 +486,8 @@ public sealed class CopilotService
             _selectorPack = pack.Id;
             _selector = new ResponseSelector(pack, new Random());
         }
+
+        _selector.Callsign = ShipCatalog.Callsign(_session.ActiveProfile?.ShipName);
     }
 
     private void Silence()

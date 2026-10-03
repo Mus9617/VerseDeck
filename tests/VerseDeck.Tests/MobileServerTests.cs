@@ -105,7 +105,7 @@ public sealed class MobileServerTests : IAsyncLifetime
 
         var buttons = await _http.GetFromJsonAsync<JsonElement>("/api/buttons");
 
-        Assert.Equal(16, buttons.GetArrayLength());
+        Assert.Equal(18, buttons.GetArrayLength());
     }
 
     [Fact]

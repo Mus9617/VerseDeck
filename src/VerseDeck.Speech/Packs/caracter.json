@@ -16,6 +16,8 @@
     "landing_gear": ["Tren. Intenta no rayarla.", "Tren, ya va."],
     "autoland": ["Aterrizaje automático. Sabia decisión."],
     "request_landing": ["Pidiendo pista. Sé amable con la torre."],
+    "atc_landing": ["Torre, aquí {nave}. Queremos aparcar, a ver si hoy toca hangar cerca.", "Pidiendo hangar. Que no nos manden al quinto pino."],
+    "atc_takeoff": ["Torre, aquí {nave}. Nos vamos, abrid cuando podáis.", "Pidiendo salida. A ver si abren esas puertas."],
     "headlights": ["Luces. Ya era hora.", "Luces, ya va."],
     "doors_toggle": ["Puertas. Que no entre nadie raro."],
     "doorlocks_toggle": ["Cierres. Desconfiado, me gusta."],

@@ -96,6 +96,9 @@ public sealed class ResponseSelector
 
     public string Greeting() => Pick("greeting", _pack.Greeting);
 
+    /// <summary>How phrases name the ship ("{nave}"): the model without its maker, such as "Syulen".</summary>
+    public string Callsign { get; set; } = string.Empty;
+
     /// <summary>Everything that could be said for these modules, used to render the cache ahead of time.</summary>
     public IReadOnlyList<string> AllFor(IEnumerable<DeckButton> buttons)
     {
@@ -118,19 +121,19 @@ public sealed class ResponseSelector
         if (custom.Length > 0)
         {
             return custom.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .Select(variant => Fill(variant, button.Name))
+                .Select(variant => FillShip(Fill(variant, button.Name)))
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
         }
 
         if (_pack.Actions.TryGetValue(button.GameAction ?? string.Empty, out var byAction))
         {
-            return byAction;
+            return byAction.Select(FillShip).ToList();
         }
 
         if (Aliases.Value.TryGetValue(button.Name, out var alias) && _pack.Actions.TryGetValue(alias, out var byName))
         {
-            return byName;
+            return byName.Select(FillShip).ToList();
         }
 
         var templates = button.Action.PressDurationMs >= HoldThresholdMs ? _pack.Hold : _pack.Generic;
@@ -156,4 +159,6 @@ public sealed class ResponseSelector
     }
 
     private static string Fill(string template, string name) => template.Replace("{nombre}", name, StringComparison.Ordinal);
+
+    private string FillShip(string template) => template.Replace("{nave}", Callsign.Length > 0 ? Callsign : "Nave", StringComparison.Ordinal);
 }

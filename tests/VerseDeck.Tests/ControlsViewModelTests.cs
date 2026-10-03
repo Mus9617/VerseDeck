@@ -48,12 +48,12 @@ public class ControlsViewModelTests
     }
 
     [Fact]
-    public async Task PresetPreview_ListsThirteenModules_WithKeyChanges()
+    public async Task PresetPreview_ListsFifteenModules_WithKeyChanges()
     {
         await using var h = await Harness.CreateAsync();
         var preview = h.Shell.Controls.PresetPreview;
 
-        Assert.Equal(13, preview.Count);
+        Assert.Equal(15, preview.Count);
         Assert.True(h.Shell.Controls.HasPresetPreview);
         var flight = preview.Single(p => p.Module == "Flight Ready");
         Assert.Equal("Alt+R", flight.CurrentKey);
@@ -76,7 +76,7 @@ public class ControlsViewModelTests
         Assert.Equal("K", KeyOf(h, "Doors"));
         Assert.Empty(h.Shell.Controls.PresetPreview);
         Assert.False(h.Shell.Controls.HasPresetPreview);
-        Assert.Equal(13, h.Shell.Controls.Links.Count);
+        Assert.Equal(15, h.Shell.Controls.Links.Count);
         Assert.Equal("Danger", h.Shell.Controls.Links.Single(l => l.Module == "Doors").StatusKey);
         Assert.Equal("Positive", h.Shell.Controls.Links.Single(l => l.Module == "Flight Ready").StatusKey);
         Assert.False(h.Shell.StatusIsError);
@@ -283,7 +283,7 @@ public class ControlsViewModelTests
 
         Assert.Equal("Combate", h.Session.ActiveProfile!.Name);
         Assert.Equal("flight_ready", h.Session.Buttons.First(b => b.Name == "Flight Ready").GameAction);
-        Assert.Equal(13, h.Shell.Controls.Links.Count);
+        Assert.Equal(15, h.Shell.Controls.Links.Count);
     }
 
     [Fact]

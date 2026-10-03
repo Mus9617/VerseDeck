@@ -290,9 +290,10 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     {
         GameActionChoices.Clear();
         GameActionChoices.Add(new GameActionChoice(string.Empty, "(ninguna: tecla manual)"));
-        foreach (var action in _catalog.Actions.OrderBy(a => a.Label, StringComparer.OrdinalIgnoreCase))
+        // Grouped as in the game's options, so a long list stays easy to scan.
+        foreach (var action in _catalog.Actions.OrderBy(a => a.Group, StringComparer.OrdinalIgnoreCase).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase))
         {
-            GameActionChoices.Add(new GameActionChoice(action.Id, action.Label));
+            GameActionChoices.Add(new GameActionChoice(action.Id, $"{action.Group} · {action.Label}"));
         }
 
         // Actions the player rebound that the catalog does not know can still be linked by their file name.

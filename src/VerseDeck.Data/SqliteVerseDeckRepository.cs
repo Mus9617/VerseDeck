@@ -425,6 +425,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
             await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
+            await SeedAtcOnceAsync(connection, repo, cancellationToken);
             return;
         }
 
@@ -433,26 +434,13 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
             foreach (var preset in DefaultButtonPresets)
             {
-                var button = await repo.SaveButtonAsync(new DeckButton(
-                    0,
-                    profile.Id,
-                    preset.Name,
-                    preset.Icon,
-                    preset.AccentColor,
-                    preset.Category,
-                    preset.Action,
-                    preset.RequiresConfirmation,
-                    true), cancellationToken);
-
-                foreach (var phrase in preset.Phrases)
-                {
-                    await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
-                }
+                await SavePresetAsync(repo, profile.Id, preset, cancellationToken);
             }
         }
 
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
         await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
+        await SeedAtcOnceAsync(connection, repo, cancellationToken);
     }
 
     // Two examples, linked to the default modules when they exist. Seeded once; the player owns them after.
@@ -681,6 +669,60 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         new("Eject", "eject", "#FF2E2E", "Emergency", new KeyPressAction("Y", ["Alt"], 60), false, ["eyectar", "eyeccion", "eject"]),
         new("Self Destruct", "warning", "#FF2E2E", "Emergency", new KeyPressAction("BACKSPACE", ["Alt"], 60), false, ["autodestruccion", "cancelar nave", "self destruct"])
     ];
+
+    // Both send the game's single landing/takeoff request; two modules so each phrase gets its own answer.
+    // Like every default module they start with a manual key and are linked to the game when the player asks.
+    private static readonly IReadOnlyList<DefaultButtonPreset> AtcPresets =
+    [
+        new("Hangar Request", "comms", "#7FD1FF", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
+            ["pedir hangar", "solicitar hangar", "pedir aterrizaje", "solicitar aterrizaje", "permiso para aterrizar", "request landing"]),
+        new("Takeoff Request", "comms", "#9BE564", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
+            ["pedir despegue", "solicitar despegue", "permiso para despegar", "pedir salida", "request takeoff"])
+    ];
+
+    private const string AtcSeededKey = "AtcModulesV1";
+
+    // Added once to every profile, new or old; a player who deletes them does not get them back.
+    private static async Task SeedAtcOnceAsync(SqliteConnection connection, SqliteVerseDeckRepository repo, CancellationToken cancellationToken)
+    {
+        var seeded = connection.CreateCommand();
+        seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{AtcSeededKey}'";
+        if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
+        {
+            return;
+        }
+
+        foreach (var profile in await repo.GetProfilesAsync(cancellationToken))
+        {
+            var buttons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
+            var present = buttons.Any(b => b.GameAction is "atc_landing" or "atc_takeoff");
+            foreach (var preset in AtcPresets.Where(p => !present && !buttons.Any(b => b.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase))))
+            {
+                await SavePresetAsync(repo, profile.Id, preset, cancellationToken);
+            }
+        }
+
+        await UpsertSetting(connection, AtcSeededKey, "Done", cancellationToken);
+    }
+
+    private static async Task SavePresetAsync(SqliteVerseDeckRepository repo, long profileId, DefaultButtonPreset preset, CancellationToken cancellationToken)
+    {
+        var button = await repo.SaveButtonAsync(new DeckButton(
+            0,
+            profileId,
+            preset.Name,
+            preset.Icon,
+            preset.AccentColor,
+            preset.Category,
+            preset.Action,
+            preset.RequiresConfirmation,
+            true), cancellationToken);
+
+        foreach (var phrase in preset.Phrases)
+        {
+            await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
+        }
+    }
 
     private sealed record DefaultButtonPreset(
         string Name,

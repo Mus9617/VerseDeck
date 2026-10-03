@@ -11,6 +11,17 @@ public static class ShipCatalog
         return ThemeService.TryParseTheme(manufacturer, out var theme) ? theme : ThemeId.Neutral;
     }
 
+    /// <summary>What the copilot calls the ship: the model without its maker ("Gatac Syulen" is "Syulen").</summary>
+    public static string Callsign(string? shipName)
+    {
+        var name = (shipName ?? string.Empty).Trim();
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 2 && Manufacturers.Value.Contains(parts[0]) ? parts[1] : name;
+    }
+
+    private static readonly Lazy<HashSet<string>> Manufacturers = new(() =>
+        Names.Select(n => n.Split(' ', 2)[0]).ToHashSet(StringComparer.OrdinalIgnoreCase));
+
     public static readonly IReadOnlyList<string> Names =
     [
         "Aegis Avenger Titan",

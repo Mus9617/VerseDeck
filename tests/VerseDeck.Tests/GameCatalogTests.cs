@@ -8,11 +8,11 @@ public class GameActionCatalogTests
     private static readonly GameActionCatalog Catalog = GameActionCatalog.Load();
 
     [Fact]
-    public void Load_Has26Actions_WithUniqueIds()
+    public void Load_HasTheFullList_WithUniqueIds()
     {
         Assert.Equal("4.10", Catalog.GameVersion);
-        Assert.Equal(26, Catalog.Actions.Count);
-        Assert.Equal(26, Catalog.Actions.Select(a => a.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(56, Catalog.Actions.Count);
+        Assert.Equal(56, Catalog.Actions.Select(a => a.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.All(Catalog.Actions, a => Assert.NotEmpty(a.ActionNames));
         Assert.All(Catalog.Actions, a => Assert.False(string.IsNullOrWhiteSpace(a.Label)));
     }
