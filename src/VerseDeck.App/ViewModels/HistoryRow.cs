@@ -18,6 +18,7 @@ public sealed record HistoryRow(string Time, string Text, double Confidence, Rec
         RecognitionOutcome.Repeated => "Ignorado: repeticion",
         RecognitionOutcome.ModuleGone => "Ignorado: el modulo ya no existe",
         RecognitionOutcome.Offline => "Ignorado: voz detenida",
+        RecognitionOutcome.NothingToDo => "Ignorado: nada en marcha",
         _ => "No enviado"
     };
 

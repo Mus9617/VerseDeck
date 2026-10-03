@@ -14,6 +14,9 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
     public event EventHandler<string>? Diagnostic;
     public event EventHandler<RecognitionHeard>? Heard;
     public bool UseDiscardModel { get; set; }
+    public IReadOnlyList<string> ChecklistNames { get; set; } = [];
+    public double CompanionMinimumConfidence { get; set; } = 0.4;
+    public event EventHandler<CompanionRecognizedEventArgs>? CompanionRecognized;
     public bool IsRunning => _engines.Count > 0;
     public bool IsListening => _isListening;
     public bool IsInputGateOpen => DateTimeOffset.Now <= _gateOpenUntil;
@@ -30,10 +33,6 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         StopAsync(cancellationToken).GetAwaiter().GetResult();
 
         var enabled = commands.Where(c => c.Enabled).ToList();
-        if (enabled.Count == 0)
-        {
-            return Task.CompletedTask;
-        }
 
         var joinedCommands = enabled
             .Join(buttons, c => c.ButtonId, b => b.Id, (c, b) => (c, b))
@@ -49,10 +48,6 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             Diagnostic?.Invoke(this, $"Voice duplicate phrase ignored after first match: '{duplicate.Key}'");
         }
 
-        if (_commands.Count == 0)
-        {
-            return Task.CompletedTask;
-        }
 
         var recognizers = CommandGrammar.Recognizers().ToList();
         if (recognizers.Count == 0)
@@ -65,11 +60,35 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
 
         foreach (var recognizer in recognizers)
         {
+            // Only the first engine has the companion vocabulary; another one with no module phrases has nothing to hear.
+            if (_engines.Count > 0 && _commands.Count == 0)
+            {
+                continue;
+            }
+
+            SpeechRecognitionEngine? engine = null;
             try
             {
-                var engine = new SpeechRecognitionEngine(recognizer);
-                // Only the first engine gets the discard model: a second one would double its cost for little gain.
-                CommandGrammar.Load(engine, _commands.Keys, UseDiscardModel && _engines.Count == 0);
+                engine = new SpeechRecognitionEngine(recognizer);
+                // Only the first engine gets the discard model and the companion vocabulary: a second one would
+                // double their cost and hear every checklist word twice.
+                var primary = _engines.Count == 0;
+                if (_commands.Count > 0)
+                {
+                    CommandGrammar.Load(engine, _commands.Keys, UseDiscardModel && primary);
+                }
+                else if (UseDiscardModel && primary)
+                {
+                    engine.LoadGrammar(new DictationGrammar { Name = CommandGrammar.Discard });
+                }
+
+                if (primary)
+                {
+                    foreach (var grammar in CompanionGrammar.Build(engine.RecognizerInfo.Culture, ChecklistNames))
+                    {
+                        engine.LoadGrammar(grammar);
+                    }
+                }
                 engine.SpeechDetected += (_, _) => Diagnostic?.Invoke(this, $"Voice speech detected by {engine.RecognizerInfo.Culture.Name}");
                 engine.SpeechRecognized += OnSpeechRecognized;
                 engine.SpeechRecognitionRejected += OnSpeechRejected;
@@ -82,6 +101,12 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
             catch (Exception ex)
             {
                 Diagnostic?.Invoke(this, $"Voice engine failed for {recognizer.Culture.Name}: {ex.Message}");
+                if (engine is not null && !_engines.Contains(engine))
+                {
+                    engine.SpeechRecognized -= OnSpeechRecognized;
+                    engine.SpeechRecognitionRejected -= OnSpeechRejected;
+                    engine.Dispose();
+                }
             }
         }
 
@@ -156,6 +181,12 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
     {
         var text = e.Result.Text;
         var confidence = e.Result.Confidence;
+        if (e.Result.Grammar?.Name is CompanionGrammar.Commands or CompanionGrammar.Notes)
+        {
+            OnCompanionRecognized(e, text, confidence);
+            return;
+        }
+
         var known = _commands.TryGetValue(text, out var match);
         var rejected = RecognitionRules.Classify(e.Result.Grammar?.Name, confidence, known ? match.Command.MinimumConfidence : 1, known, IsInputGateOpen);
         if (rejected is { } outcome)
@@ -180,4 +211,23 @@ public sealed class WindowsSpeechCommandService : IVoiceCommandService
         Diagnostic?.Invoke(this, $"Voice rejected. Alternates: {alternates}");
     }
 
+
+    private void OnCompanionRecognized(SpeechRecognizedEventArgs e, string text, double confidence)
+    {
+        var command = CompanionParser.Parse(text);
+        RecognitionOutcome? rejected = !IsInputGateOpen ? RecognitionOutcome.GateClosed
+            : confidence < CompanionMinimumConfidence ? RecognitionOutcome.LowConfidence
+            : command is null ? RecognitionOutcome.Discarded
+            : null;
+        if (rejected is { } outcome)
+        {
+            Diagnostic?.Invoke(this, $"Voice companion {outcome} '{text}' confidence={Invariant.Format(confidence)}");
+            Heard?.Invoke(this, new RecognitionHeard(text, confidence, outcome, DateTimeOffset.Now));
+            return;
+        }
+
+        Diagnostic?.Invoke(this, $"Voice companion accepted '{text}' confidence={Invariant.Format(confidence)}");
+        DateTimeOffset? heardAt = e.Result.Audio is { } audio ? new DateTimeOffset(audio.StartTime) : null;
+        CompanionRecognized?.Invoke(this, new CompanionRecognizedEventArgs(command!, text, confidence, heardAt));
+    }
 }

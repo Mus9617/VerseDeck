@@ -18,6 +18,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => TitleBar.SetDark(this, true);
         Loaded += async (_, _) => await _shell.InitializeAsync();
         Closing += OnClosing;
+        StateChanged += (_, _) => _shell.IsMinimized = WindowState == WindowState.Minimized;
     }
 
     private async void OnClosing(object? sender, CancelEventArgs e)

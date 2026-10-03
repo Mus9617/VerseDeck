@@ -141,6 +141,7 @@ public sealed class CopilotService
     // An answer that arrives this long after the action is confusing; it is cached for next time instead.
     private static readonly TimeSpan TooLate = TimeSpan.FromSeconds(2);
 
+
     private readonly DeckSession _session;
     private readonly ITtsEngine _engine;
     private readonly PhraseCache _cache;
@@ -158,6 +159,7 @@ public sealed class CopilotService
     private bool _muted;
     private CancellationTokenSource? _saying;
     private CancellationTokenSource? _warmUp;
+    private CancellationTokenSource? _idle;
 
     public CopilotService(
         DeckSession session,
@@ -197,6 +199,15 @@ public sealed class CopilotService
     public VoiceStore Store => _store;
     public int CachedPhrases => _cache.Count;
     public string WarmUpStatus { get; private set; } = string.Empty;
+
+    /// <summary>Phrases other features will say (checklist steps, timer alerts), rendered by the warm-up too.</summary>
+    public Func<IEnumerable<string>>? ExtraPhrases { get; set; }
+
+    /// <summary>A model loaded for a phrase that was not cached is freed after this long without another one.</summary>
+    public TimeSpan IdleUnload { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>The pending release of a model loaded on the fly, for tests.</summary>
+    public Task IdleRelease { get; private set; } = Task.CompletedTask;
 
     /// <summary>The last speech or warm-up started in the background, so callers can wait for it.</summary>
     public Task Pending { get; private set; } = Task.CompletedTask;
@@ -267,7 +278,8 @@ public sealed class CopilotService
     /// <summary>Speaks a sample with the chosen voice even when the copilot is switched off or muted.</summary>
     public Task TestAsync() => SayAsync(TestPhrase, force: true);
 
-    public async Task SayAsync(string text, bool force = false)
+    /// <param name="whenReady">Say it however long it takes: for announcements that are not an answer to a key press.</param>
+    public async Task SayAsync(string text, bool force = false, bool whenReady = false)
     {
         var voice = ActiveVoice;
         if (voice is null || (Muted && !force))
@@ -286,8 +298,16 @@ public sealed class CopilotService
             var source = phrase is null ? "generated" : "cache";
             if (phrase is null)
             {
-                var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
-                phrase = _cache.Store(voice, text, audio);
+                try
+                {
+                    var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
+                    phrase = _cache.Store(voice, text, audio);
+                }
+                finally
+                {
+                    // Even a failed attempt may have loaded the model.
+                    UnloadWhenIdle();
+                }
             }
 
             if (mine != Volatile.Read(ref _sequence) || (Muted && !force))
@@ -296,7 +316,7 @@ public sealed class CopilotService
             }
 
             var now = _clock();
-            if (now - asked > TooLate)
+            if (!whenReady && now - asked > TooLate)
             {
                 _log.Write($"Copilot kept '{text}' for next time: it was ready {(now - asked).TotalSeconds:0.0} s after the action");
                 return;
@@ -328,7 +348,7 @@ public sealed class CopilotService
         _warmUp?.Cancel();
         var cancellation = _warmUp = new CancellationTokenSource();
         UseCurrentPack();
-        var wanted = _selector.AllFor(_session.Buttons);
+        var wanted = _selector.AllFor(_session.Buttons).Concat(ExtraPhrases?.Invoke() ?? []).Distinct().ToList();
         var missing = wanted.Count(text => _cache.TryGet(voice, text) is null);
         var done = 0;
         foreach (var text in wanted)
@@ -430,6 +450,25 @@ public sealed class CopilotService
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // The game needs the memory more than an idle voice model does; the next phrase reloads it.
+    private void UnloadWhenIdle()
+    {
+        var idle = new CancellationTokenSource();
+        Interlocked.Exchange(ref _idle, idle)?.Cancel();
+        IdleRelease = Task.Delay(IdleUnload, idle.Token).ContinueWith(
+            _ =>
+            {
+                // A warm-up in progress unloads the model itself when it finishes.
+                if (ReferenceEquals(Volatile.Read(ref _idle), idle) && WarmUpStatus.Length == 0)
+                {
+                    _engine.Unload();
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnRanToCompletion,
+            TaskScheduler.Default);
     }
 
     private void UseCurrentPack()

@@ -75,6 +75,7 @@ public sealed partial class VoiceViewModel : ObservableObject
         _voice.Diagnostic += (_, message) => log.Write($"Voice: {message}");
         _voice.CommandRecognized += (_, e) => _ui.Post(() => Pending = HandleRecognizedAsync(e));
         _voice.Heard += (_, heard) => _ui.Post(() => Record(heard.Text, heard.Confidence, heard.Outcome));
+        _voice.CompanionRecognized += (_, e) => _ui.Post(() => Pending = HandleCompanionAsync(e));
         _ptt.PressedChanged += (_, pressed) => _ui.Post(() => OnPttChanged(pressed));
     }
 
@@ -88,6 +89,9 @@ public sealed partial class VoiceViewModel : ObservableObject
 
     /// <summary>Checks phrases offline with the copilot's voice; set by the shell.</summary>
     public VoiceDoctor? Doctor { get; set; }
+
+    /// <summary>Carries out checklist, timer and note requests; set by the shell. Returns what came of it.</summary>
+    public Func<CompanionCommand, Task<RecognitionOutcome>>? CompanionHandler { get; set; }
 
     public const int HistorySize = 20;
 
@@ -281,6 +285,8 @@ public sealed partial class VoiceViewModel : ObservableObject
             .Select(c => c with { MinimumConfidence = Math.Min(c.MinimumConfidence, settings.VoiceMinimumConfidence) })
             .ToList();
         _voice.UseDiscardModel = settings.VoiceActivationMode != PushToTalk;
+        _voice.ChecklistNames = _session.Checklists.Select(c => c.Name).ToList();
+        _voice.CompanionMinimumConfidence = settings.VoiceMinimumConfidence;
         await _voice.StartAsync(commands, _session.Buttons);
         if (!_voice.IsRunning)
         {
@@ -420,13 +426,33 @@ public sealed partial class VoiceViewModel : ObservableObject
         }
     }
 
+    private async Task HandleCompanionAsync(CompanionRecognizedEventArgs e)
+    {
+        // The same protections as module commands: voice off, the copilot's own voice, or an echo.
+        var now = _clock();
+        var ignored = State == LinkState.Offline ? RecognitionOutcome.Offline
+            : _guard.Blocks(e.HeardAt ?? now) || _guard.Blocks(now) ? RecognitionOutcome.CopilotSpeaking
+            : now - _lastRecognition < RecognitionDebounce ? RecognitionOutcome.Repeated
+            : (RecognitionOutcome?)null;
+        if (ignored is { } reason)
+        {
+            Record(e.Text, e.Confidence, reason);
+            return;
+        }
+
+        _lastRecognition = now;
+        var outcome = CompanionHandler is null ? RecognitionOutcome.NothingToDo : await CompanionHandler(e.Command);
+        Record(e.Text, e.Confidence, outcome);
+    }
+
     // Everything the running engine depends on: what it listens for and how it is activated.
     private string EngineSignature()
     {
         var settings = _session.Settings;
         var phrases = string.Join("|", _session.VoiceCommands.Select(c => $"{c.ButtonId}:{c.Phrase}:{c.MinimumConfidence}:{c.Enabled}"));
         var buttons = string.Join("|", _session.Buttons.Select(b => $"{b.Id}:{b.Name}"));
-        return $"{settings.VoiceActivationMode};{settings.PushToTalkDevice};{settings.PushToTalkBinding};{settings.VoiceMinimumConfidence};{phrases};{buttons}";
+        var checklists = string.Join("|", _session.Checklists.Select(c => c.Name));
+        return $"{settings.VoiceActivationMode};{settings.PushToTalkDevice};{settings.PushToTalkBinding};{settings.VoiceMinimumConfidence};{phrases};{buttons};{checklists}";
     }
 
     private string ArmedText() => $"PTT armado: manten {_session.Settings.PushToTalkDevice}:{_session.Settings.PushToTalkBinding}";
