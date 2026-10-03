@@ -41,6 +41,9 @@ public static class ShipCatalog
         ("Tumbril", ["Cyclone", "Cyclone AA", "Cyclone MT", "Cyclone RC", "Cyclone RN", "Cyclone TR", "Nova", "Storm", "Storm AA"])
     ];
 
+    /// <summary>The ship of the profile a fresh install creates.</summary>
+    public const string DefaultShip = "Starter Ship";
+
     public static readonly IReadOnlyList<string> Names = Fleet
         .SelectMany(f => f.Models.Select(model => $"{f.Maker} {model}"))
         .ToList();
@@ -68,6 +71,13 @@ public static class ShipCatalog
     public static string Callsign(string? shipName)
     {
         var name = (shipName ?? string.Empty).Trim();
+
+        // The placeholder of a fresh install is not a ship anyone would call by name.
+        if (name.Equals(DefaultShip, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
         return MakerOf(name) is { } maker ? name[(maker.Length + 1)..].Trim() : name;
     }
 }

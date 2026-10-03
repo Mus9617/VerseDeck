@@ -81,15 +81,19 @@
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Voice.JustHeard}" Value="True">
-                                            <DataTrigger.EnterActions>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding Voice.JustHeard}" Value="True"/>
+                                                <Condition Binding="{Binding AnimationsActive}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <MultiDataTrigger.EnterActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
                                                         <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.6"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                        </DataTrigger>
+                                            </MultiDataTrigger.EnterActions>
+                                        </MultiDataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>

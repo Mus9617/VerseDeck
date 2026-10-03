@@ -426,8 +426,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         seeded.CommandText = $"SELECT Value FROM Settings WHERE Key='{DefaultDeckSeededKey}'";
         if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
-            await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
             await SeedAtcOnceAsync(connection, repo, cancellationToken);
+            await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
             return;
         }
 
@@ -441,8 +441,9 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         }
 
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
-        await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
+        // The control tower modules first, so the example checklists can point at them.
         await SeedAtcOnceAsync(connection, repo, cancellationToken);
+        await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
     }
 
     // Two examples, linked to the default modules when they exist. Seeded once; the player owns them after.
@@ -467,7 +468,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         [
             Step(1, "Preparar vuelo", "Flight Ready"),
             Step(2, "Luces", "Lights"),
-            Step(3, "Pedir permiso de despegue", null),
+            Step(3, "Pedir permiso de despegue", "Takeoff Request"),
             Step(4, "Despegar y subir el tren", "Landing Gear")
         ]), cancellationToken);
         }
@@ -476,7 +477,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         {
         await repo.SaveChecklistAsync(new Checklist(0, profileId, "Aterrizaje",
         [
-            Step(1, "Pedir permiso de aterrizaje", null),
+            Step(1, "Pedir permiso de aterrizaje", "Hangar Request"),
             Step(2, "Bajar el tren", "Landing Gear"),
             Step(3, "Apagar motores", "Engines Toggle")
         ]), cancellationToken);
@@ -684,6 +685,9 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
 
     private const string AtcSeededKey = "AtcModulesV1";
 
+    // A module the player already linked to the same request counts as present.
+    private static readonly Dictionary<string, string> AtcLinks = new() { ["Hangar Request"] = "atc_landing", ["Takeoff Request"] = "atc_takeoff" };
+
     // Added once to every profile, new or old; a player who deletes them does not get them back.
     private static async Task SeedAtcOnceAsync(SqliteConnection connection, SqliteVerseDeckRepository repo, CancellationToken cancellationToken)
     {
@@ -697,8 +701,8 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         foreach (var profile in await repo.GetProfilesAsync(cancellationToken))
         {
             var buttons = await repo.GetButtonsAsync(profile.Id, cancellationToken);
-            var present = buttons.Any(b => b.GameAction is "atc_landing" or "atc_takeoff");
-            foreach (var preset in AtcPresets.Where(p => !present && !buttons.Any(b => b.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase))))
+            foreach (var preset in AtcPresets.Where(p => !buttons.Any(b =>
+                b.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase) || b.GameAction == AtcLinks[p.Name])))
             {
                 await SavePresetAsync(repo, profile.Id, preset, cancellationToken);
             }

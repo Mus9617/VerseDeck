@@ -161,6 +161,9 @@ public sealed class CopilotService
     private CancellationTokenSource? _warmUp;
     private CancellationTokenSource? _idle;
 
+    // The first callsign is rendered by the start-up warm-up; only later changes need their own.
+    private bool _callsignKnown;
+
     public CopilotService(
         DeckSession session,
         ButtonExecutor executor,
@@ -439,7 +442,7 @@ public sealed class CopilotService
         UseCurrentPack();
 
         // Another ship means other words in the control tower phrases: render them before they are needed.
-        if (callsign.Length > 0 && callsign != _selector.Callsign && CanSpeak)
+        if (_callsignKnown && callsign != _selector.Callsign && CanSpeak)
         {
             _ = WarmUpAsync();
         }
@@ -488,6 +491,7 @@ public sealed class CopilotService
         }
 
         _selector.Callsign = ShipCatalog.Callsign(_session.ActiveProfile?.ShipName);
+        _callsignKnown |= _session.ActiveProfile is not null;
     }
 
     private void Silence()

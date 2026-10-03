@@ -16,7 +16,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = shell;
         SourceInitialized += (_, _) => TitleBar.SetDark(this, true);
-        Loaded += async (_, _) => await _shell.InitializeAsync();
+        Loaded += async (_, _) =>
+        {
+            _shell.IsWindowActive = IsActive;
+            await _shell.InitializeAsync();
+        };
         Closing += OnClosing;
         StateChanged += (_, _) => _shell.IsMinimized = WindowState == WindowState.Minimized;
         Activated += (_, _) => _shell.IsWindowActive = true;

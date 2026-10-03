@@ -370,7 +370,8 @@ public sealed partial class ShellViewModel : ObservableObject, IStatusSink
         }
     }
 
-    private bool _isWindowActive = true;
+    // Starts false: a window opened behind the game never gets Activated, and must not animate.
+    private bool _isWindowActive;
 
     /// <summary>
     /// Whether the neon breathes. It stops completely, not just hides, while the player is in the game:

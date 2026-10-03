@@ -54,7 +54,8 @@ public class CallsignTests
     [Theory]
     [InlineData("Gatac Syulen", "Syulen")]
     [InlineData("Aegis Avenger Titan", "Avenger Titan")]
-    [InlineData("Starter Ship", "Starter Ship")]
+    [InlineData("Starter Ship", "")]
+    [InlineData("Starter Shipyard", "Starter Shipyard")]
     [InlineData("Consolidated Outland Mustang Alpha", "Mustang Alpha")]
     [InlineData("Originals Rock", "Originals Rock")]
     [InlineData("  ", "")]
@@ -167,6 +168,10 @@ public class AnimationTests
     public async Task Neon_BreathesOnlyWhileTheWindowIsInFront_AndTheSettingIsOn()
     {
         await using var h = await Harness.CreateAsync();
+
+        // Opened behind the game: nothing moves until the window is really in front.
+        Assert.False(h.Shell.AnimationsActive);
+        h.Shell.IsWindowActive = true;
         Assert.True(h.Shell.AnimationsActive);
 
         h.Shell.IsWindowActive = false;
@@ -197,5 +202,64 @@ public class HeardBlinkTests
         Assert.True(h.Shell.Voice.JustHeard);
         Assert.Equal(1, h.Ui.Fire(TimeSpan.FromMilliseconds(600)));
         Assert.False(h.Shell.Voice.JustHeard);
+    }
+}
+
+public class PuenteReviewTests
+{
+    [Fact]
+    public async Task OnePresetLinkedAlready_TheOtherIsStillAdded_InEveryProfile()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        var global = (await repository.GetProfilesAsync()).Single(p => p.IsActive);
+        var second = await repository.SaveProfileAsync(new Profile(0, "Carga", "MISC Hull C", "Carga", false));
+        foreach (var button in (await repository.GetButtonsAsync(global.Id)).Where(b => b.Name is "Hangar Request" or "Takeoff Request"))
+        {
+            await repository.DeleteButtonAsync(button.Id);
+        }
+
+        // The player had linked a module of their own to the hangar request.
+        await repository.SaveButtonAsync(new DeckButton(0, global.Id, "Torre", "comms", "#fff", "Flight", new KeyPressAction("N", ["LAlt"], 60), false, true, "atc_landing"));
+        await db.ExecuteAsync("DELETE FROM Settings WHERE Key = 'AtcModulesV1';");
+
+        var again = new SqliteVerseDeckRepository(db.Path);
+        await again.InitializeAsync();
+
+        var globalNames = (await again.GetButtonsAsync(global.Id)).Select(b => b.Name).ToList();
+        Assert.DoesNotContain("Hangar Request", globalNames);
+        Assert.Contains("Takeoff Request", globalNames);
+        var secondNames = (await again.GetButtonsAsync(second.Id)).Select(b => b.Name).ToList();
+        Assert.Contains("Hangar Request", secondNames);
+        Assert.Contains("Takeoff Request", secondNames);
+    }
+
+    [Fact]
+    public async Task ExampleChecklists_AskTheTowerThroughItsModules()
+    {
+        await using var h = await Harness.CreateAsync();
+        var hangar = h.Session.Buttons.Single(b => b.Name == "Hangar Request");
+        var takeoff = h.Session.Buttons.Single(b => b.Name == "Takeoff Request");
+
+        Assert.Equal(hangar.Id, h.Session.Checklists.Single(c => c.Name == "Aterrizaje").Steps[0].ButtonId);
+        Assert.Equal(takeoff.Id, h.Session.Checklists.Single(c => c.Name == "Prevuelo").Steps[2].ButtonId);
+    }
+
+    [Fact]
+    public async Task GivingTheStarterProfileAShip_RendersTheTowerPhrasesAhead()
+    {
+        await using var h = await Harness.CreateAsync();
+        await h.EnableCopilotAsync();
+        await h.Session.SaveSettingsAsync(h.Session.Settings with { CopilotPack = "militar" });
+        await h.Copilot.WarmUpAsync();
+        Assert.DoesNotContain(h.Tts.Synthesized, t => t.Contains("Syulen"));
+
+        await h.Session.SaveProfileAsync(h.Session.ActiveProfile!.Name, "Gatac Syulen");
+        for (var i = 0; i < 50 && !h.Tts.Synthesized.Any(t => t.Contains("Syulen")); i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.Contains(h.Tts.Synthesized, t => t.Contains("aquí Syulen"));
     }
 }
