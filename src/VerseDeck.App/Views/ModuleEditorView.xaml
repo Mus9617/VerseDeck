@@ -48,6 +48,12 @@
                 </StackPanel>
             </Grid>
 
+            <StackPanel IsEnabled="{Binding Editor.IsManual}">
+                <TextBlock Text="MANTENER" Style="{StaticResource FieldLabel}"/>
+                <ComboBox ItemsSource="{Binding Editor.Holds}" SelectedItem="{Binding Editor.Hold}" DisplayMemberPath="Label" Width="170" HorizontalAlignment="Left"
+                          ToolTip="Algunas acciones del juego solo responden si se mantiene la tecla, como el quantum (B). Sigue siendo una sola pulsacion, de 2 s como maximo."/>
+            </StackPanel>
+
             <TextBlock Text="Tecla tomada del juego. Cambiala en Star Citizen o elige (ninguna) para escribirla a mano." Style="{StaticResource Muted}" Margin="0,6,0,0"
                        Visibility="{Binding Editor.IsLinked, Converter={StaticResource BoolToVisibility}}"/>
 

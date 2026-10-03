@@ -1,0 +1,12 @@
+{
+  "atc_landing": [
+    "{nave}, aquí control. Solicitud recibida, su hangar aparecerá en el visor.",
+    "Recibido, {nave}. Procesando su aterrizaje, atento a la asignación.",
+    "Control a {nave}: le tenemos. Siga las indicaciones del visor para el hangar."
+  ],
+  "atc_takeoff": [
+    "{nave}, aquí control. Solicitud de salida recibida, atento a las puertas del hangar.",
+    "Recibido, {nave}. Preparando su salida, despeje la plataforma.",
+    "Control a {nave}: salida en proceso. Buen vuelo."
+  ]
+}

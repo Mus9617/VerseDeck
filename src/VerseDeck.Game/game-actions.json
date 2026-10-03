@@ -2,7 +2,7 @@
   "gameVersion": "4.10",
   "actions": [
     { "id": "flight_ready", "group": "Vuelo", "label": "Preparar vuelo", "actionMap": "spaceship_general", "actions": ["v_flightready"], "default": "ralt+r", "pressMs": 60 },
-    { "id": "master_mode", "group": "Vuelo", "label": "Modo maestro NAV/SCM (mantener)", "actionMap": "spaceship_movement", "actions": ["v_master_mode_cycle"], "default": "b", "pressMs": 600 },
+    { "id": "master_mode", "group": "Vuelo", "label": "Modo maestro NAV/SCM (mantener)", "actionMap": "spaceship_movement", "actions": ["v_master_mode_cycle"], "default": "b", "pressMs": 1000 },
     { "id": "decoupled", "group": "Vuelo", "label": "Desacoplado", "actionMap": "spaceship_movement", "actions": ["v_ifcs_toggle_vector_decoupling"], "default": "c", "pressMs": 60 },
     { "id": "cruise", "group": "Vuelo", "label": "Crucero", "actionMap": "spaceship_movement", "actions": ["v_ifcs_toggle_cruise_control"], "default": "lalt+c", "pressMs": 60 },
     { "id": "vtol", "group": "Vuelo", "label": "VTOL", "actionMap": "spaceship_movement", "actions": ["v_toggle_vtol"], "default": "k", "pressMs": 60 },

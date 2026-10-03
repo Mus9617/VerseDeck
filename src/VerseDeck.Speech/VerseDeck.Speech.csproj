@@ -7,6 +7,7 @@
   <ItemGroup>
     <EmbeddedResource Include="voices.json" />
     <EmbeddedResource Include="aliases.json" />
+    <EmbeddedResource Include="tower.json" />
     <EmbeddedResource Include="Packs\*.json" />
   </ItemGroup>
 

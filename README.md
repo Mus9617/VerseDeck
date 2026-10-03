@@ -41,13 +41,13 @@ VerseDeck lee `actionmaps.xml` de tu perfil de Star Citizen y usa tu tecla en lo
 - Solo lectura: nunca escribe en la carpeta del juego ni abre `Data.p4k`.
 - El juego solo guarda lo que has cambiado. Para lo demas se usa un catalogo propio de teclas por defecto, valido para la version **4.10**; tras un parche puede dejar de coincidir.
 - Los nombres internos de las acciones del catalogo vienen de documentacion comunitaria y no estan verificados contra el juego. Si un modulo vinculado ignora tu rebind, vinculalo a la accion tal como aparece en "Tus rebinds".
-- Las acciones que piden mantener la tecla (autodestruccion, modo maestro, aterrizaje automatico) se envian como una sola pulsacion larga, de 2 segundos como maximo.
+- Las acciones que piden mantener la tecla (autodestruccion, modo maestro y quantum con B, aterrizaje automatico) se envian como una sola pulsacion larga, de 2 segundos como maximo. En los modulos con tecla manual, el campo MANTENER del editor elige toque o 0,5 a 2 segundos.
 - No se envian botones de raton, mando o joystick ni dobles pulsaciones.
 - El catalogo tiene 56 acciones agrupadas (Vuelo, Aterrizaje, Energia, Sistemas, Operador, Objetivos, Defensa, Interfaz, A pie). Las teclas por defecto se han cruzado entre dos guias publicas de 4.10; cuando no coinciden, la accion queda sin tecla por defecto en vez de arriesgar una pulsacion equivocada. No se leen los archivos internos del juego para no rozar el EULA.
 
 ### Control de trafico
 
-Dos modulos, **Hangar Request** ("pedir hangar", "solicitar aterrizaje") y **Takeoff Request** ("pedir despegue", "pedir salida"), envian la unica tecla de permiso del juego (LAlt+N por defecto, o la tuya al vincularlos). El copiloto contesta en papel de controlador y nombra tu nave ("Control, aqui Syulen, solicitando hangar"). Sin leer la memoria del juego no puede saber si te han asignado hangar o si se han abierto las puertas, asi que confirma que la peticion salio, nunca lo que paso dentro del juego.
+Dos modulos, **Hangar Request** ("pedir hangar", "solicitar aterrizaje") y **Takeoff Request** ("pedir despegue", "pedir salida"), envian la unica tecla de permiso del juego (LAlt+N por defecto, o la tuya al vincularlos). Es un dialogo a dos voces: tu copiloto pide ("Syulen a control: solicitamos salida") y la torre contesta por radio ("Syulen, aqui control..."). La torre usa otra voz instalada si la hay, y siempre un efecto de radio (banda de comunicaciones, ruido y clic de canal) generado una vez y guardado. Si das otra orden entre medias, la torre no interrumpe. Sin leer la memoria del juego no puede saber si te han asignado hangar o si se han abierto las puertas, asi que confirma que la peticion salio, nunca lo que paso dentro del juego.
 
 ## Copiloto
 

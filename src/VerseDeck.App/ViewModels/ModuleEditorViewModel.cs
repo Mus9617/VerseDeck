@@ -51,6 +51,9 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     private bool _requiresConfirmation;
 
     [ObservableProperty]
+    private HoldChoice _hold = HoldChoices[0];
+
+    [ObservableProperty]
     private string _newPhrase = string.Empty;
 
     [ObservableProperty]
@@ -85,6 +88,27 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
     public const string ResponseNone = "Ninguna";
 
     public IReadOnlyList<string> ResponseModes { get; } = [ResponseFromPack, ResponseCustom, ResponseNone];
+
+    /// <summary>How long a manual key is held: some game actions (quantum, exit seat) only react to a hold. Never over 2 s.</summary>
+    public static IReadOnlyList<HoldChoice> HoldChoices { get; } =
+    [
+        new("Toque", ManualPressMs),
+        new("Mantener 0,5 s", 500),
+        new("Mantener 1 s", 1000),
+        new("Mantener 1,5 s", 1500),
+        new("Mantener 2 s", 2000)
+    ];
+
+    public IReadOnlyList<HoldChoice> Holds => HoldChoices;
+
+    // A long hold belonged to the game action the module was linked to; unlinked, it goes back to a tap.
+    partial void OnSelectedGameActionChanged(GameActionChoice? value)
+    {
+        if (IsManual && !string.IsNullOrEmpty(_button?.GameAction))
+        {
+            Hold = HoldChoices[0];
+        }
+    }
     public ObservableCollection<string> Phrases { get; } = [];
     public ObservableCollection<GameActionChoice> GameActionChoices { get; } = [];
 
@@ -117,6 +141,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
         Key = button.Action.Key;
         Modifiers = string.Join(", ", button.Action.Modifiers);
         RequiresConfirmation = button.RequiresConfirmation;
+        Hold = HoldChoices.MinBy(h => Math.Abs(h.Ms - button.Action.PressDurationMs))!;
         var response = (button.Response ?? string.Empty).Trim();
         SelectedResponseMode = response.Length == 0 ? ResponseFromPack : response == Speech.ResponseSelector.Silent ? ResponseNone : ResponseCustom;
         ResponseText = SelectedResponseMode == ResponseCustom ? response : string.Empty;
@@ -139,7 +164,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
 
         // A linked module keeps its current key until the sync writes the game's key.
         var action = _button.Action;
-        if (!TryReadName(out var name) || (IsManual && !TryBuildAction(Key, ManualPressMs, out action)))
+        if (!TryReadName(out var name) || (IsManual && !TryBuildAction(Key, Hold.Ms, out action)))
         {
             return;
         }
@@ -184,7 +209,7 @@ public sealed partial class ModuleEditorViewModel : ObservableObject
             return;
         }
 
-        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) || IsLinked ? "F13" : Key, ManualPressMs, out var action)
+        if (!TryReadName(out var name) || !TryBuildAction(string.IsNullOrWhiteSpace(Key) || IsLinked ? "F13" : Key, IsLinked ? ManualPressMs : Hold.Ms, out var action)
             || !TryReadResponse(out var response))
         {
             return;

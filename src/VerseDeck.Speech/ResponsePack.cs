@@ -99,6 +99,42 @@ public sealed class ResponseSelector
     /// <summary>How phrases name the ship ("{nave}"): the model without its maker, such as "Syulen".</summary>
     public string Callsign { get; set; } = string.Empty;
 
+    // The control tower is the same whoever the copilot is, so its lines live outside the packs.
+    private static readonly Lazy<Dictionary<string, List<string>>> TowerLines = new(() =>
+    {
+        using var stream = Resources.Open("tower.json");
+        return new Dictionary<string, List<string>>(
+            JsonSerializer.Deserialize<Dictionary<string, List<string>>>(stream, Resources.Json) ?? [],
+            StringComparer.OrdinalIgnoreCase);
+    });
+
+    /// <summary>What the control tower answers after the copilot, or null when the module is not a tower request.</summary>
+    public string? TowerFor(DeckButton button)
+    {
+        var variants = TowerVariantsFor(button);
+        return variants.Count == 0 ? null : Pick($"tower:{button.Id}", variants);
+    }
+
+    /// <summary>Every tower answer these modules could get, for the warm-up.</summary>
+    public IReadOnlyList<string> AllTowerFor(IEnumerable<DeckButton> buttons)
+    {
+        return buttons.SelectMany(TowerVariantsFor).Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private IReadOnlyList<string> TowerVariantsFor(DeckButton button)
+    {
+        // A module the player set to stay silent gets no dialogue either.
+        if ((button.Response ?? string.Empty).Trim() == Silent)
+        {
+            return [];
+        }
+
+        var key = !string.IsNullOrEmpty(button.GameAction) ? button.GameAction : Aliases.Value.GetValueOrDefault(button.Name);
+        return key is not null && TowerLines.Value.TryGetValue(key, out var lines)
+            ? lines.Select(FillShip).ToList()
+            : [];
+    }
+
     /// <summary>Everything that could be said for these modules, used to render the cache ahead of time.</summary>
     public IReadOnlyList<string> AllFor(IEnumerable<DeckButton> buttons)
     {

@@ -427,6 +427,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         if (await seeded.ExecuteScalarAsync(cancellationToken) is not null)
         {
             await SeedAtcOnceAsync(connection, repo, cancellationToken);
+            await AddTowerPhrasesOnceAsync(connection, repo, cancellationToken);
             await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
             return;
         }
@@ -443,6 +444,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         await UpsertSetting(connection, DefaultDeckSeededKey, "Done", cancellationToken);
         // The control tower modules first, so the example checklists can point at them.
         await SeedAtcOnceAsync(connection, repo, cancellationToken);
+        await AddTowerPhrasesOnceAsync(connection, repo, cancellationToken);
         await SeedChecklistsOnceAsync(connection, repo, profile.Id, cancellationToken);
     }
 
@@ -662,7 +664,7 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
         new("Lights", "lights", "#F7E967", "Systems", new KeyPressAction("L", [], 60), false, ["activar luces", "activar luzes", "apagar luces", "apagar luzes", "lights on", "lights off", "toggle lights"]),
         new("Radar Ping", "radar", "#65E4FF", "Scan", new KeyPressAction("TAB", [], 60), false, ["activar radar", "ping radar", "escanear radar", "radar ping", "scan ping"]),
         new("Scan Mode", "scan", "#54D6A7", "Scan", new KeyPressAction("V", [], 60), false, ["activar escaner", "modo escaner", "iniciar escaneo", "scan mode", "scanner mode"]),
-        new("Quantum Mode", "quantum", "#B78CFF", "Navigation", new KeyPressAction("B", [], 60), false, ["activar salto", "modo quantum", "activar quantum", "preparar salto", "quantum mode", "activate quantum", "quantum jump"]),
+        new("Quantum Mode", "quantum", "#B78CFF", "Navigation", new KeyPressAction("B", [], QuantumHoldMs), false, ["activar salto", "modo quantum", "activar quantum", "preparar salto", "quantum mode", "activate quantum", "quantum jump"]),
         new("Star Map", "map", "#4CC9F0", "Navigation", new KeyPressAction("F2", [], 60), false, ["abrir mapa", "abrir mapa estelar", "cerrar mapa", "star map", "open map"]),
         new("Shields", "shield", "#2EF6D1", "Combat", new KeyPressAction("O", [], 60), false, ["activar escudos", "apagar escudos", "subir escudos", "shields", "shields on", "shields off"]),
         new("Weapons", "weapons", "#FF4D6D", "Combat", new KeyPressAction("P", [], 60), false, ["activar armas", "guardar armas", "armar nave", "weapons", "weapons on", "weapons off"]),
@@ -678,12 +680,49 @@ public sealed class SqliteVerseDeckRepository : IVerseDeckRepository
     private static readonly IReadOnlyList<DefaultButtonPreset> AtcPresets =
     [
         new("Hangar Request", "comms", "#7FD1FF", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
-            ["pedir hangar", "solicitar hangar", "pedir aterrizaje", "solicitar aterrizaje", "permiso para aterrizar", "request landing"]),
+            ["pedir hangar", "solicitar hangar", "pedir aterrizaje", "solicitar aterrizaje", "permiso para aterrizar", "pedir entrada", "entrar al hangar", "request landing"]),
         new("Takeoff Request", "comms", "#9BE564", "Flight", new KeyPressAction("N", ["LAlt"], 60), false,
-            ["pedir despegue", "solicitar despegue", "permiso para despegar", "pedir salida", "request takeoff"])
+            ["pedir despegue", "solicitar despegue", "permiso para despegar", "pedir salida", "solicitar salida", "salida de hangar", "pedir salida de hangar", "abrir hangar", "request takeoff"])
     ];
 
     private const string AtcSeededKey = "AtcModulesV1";
+
+    // The game switches to NAV/quantum only when B is held; a tap does nothing.
+    private const int QuantumHoldMs = 1000;
+
+    // Phrases added after the tower modules first shipped, for decks that already have those modules.
+    private static async Task AddTowerPhrasesOnceAsync(SqliteConnection connection, SqliteVerseDeckRepository repo, CancellationToken cancellationToken)
+    {
+        var done = connection.CreateCommand();
+        done.CommandText = "SELECT Value FROM Settings WHERE Key='AtcPhrasesV2'";
+        if (await done.ExecuteScalarAsync(cancellationToken) is not null)
+        {
+            return;
+        }
+
+        var existing = await repo.GetVoiceCommandsAsync(cancellationToken);
+        foreach (var profile in await repo.GetProfilesAsync(cancellationToken))
+        {
+            foreach (var button in await repo.GetButtonsAsync(profile.Id, cancellationToken))
+            {
+                var preset = AtcPresets.FirstOrDefault(p => p.Name.Equals(button.Name, StringComparison.OrdinalIgnoreCase));
+                foreach (var phrase in preset?.Phrases ?? [])
+                {
+                    if (!existing.Any(v => v.ButtonId == button.Id && v.Phrase.Equals(phrase, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        await repo.SaveVoiceCommandAsync(new VoiceCommand(0, button.Id, phrase, 0.40, true), cancellationToken);
+                    }
+                }
+            }
+        }
+
+        // A Quantum Mode module still on the old tap gets the hold the game needs; one the player changed is left alone.
+        var quantum = connection.CreateCommand();
+        quantum.CommandText = $"UPDATE Buttons SET PressDurationMs={QuantumHoldMs} WHERE Name='Quantum Mode' AND ActionKey='B' AND IFNULL(ActionModifiers,'') IN ('', '[]') AND PressDurationMs=60 AND IFNULL(GameAction,'')=''";
+        await quantum.ExecuteNonQueryAsync(cancellationToken);
+
+        await UpsertSetting(connection, "AtcPhrasesV2", "Done", cancellationToken);
+    }
 
     // A module the player already linked to the same request counts as present.
     private static readonly Dictionary<string, string> AtcLinks = new() { ["Hangar Request"] = "atc_landing", ["Takeoff Request"] = "atc_takeoff" };

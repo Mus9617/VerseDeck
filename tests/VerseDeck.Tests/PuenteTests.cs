@@ -263,3 +263,147 @@ public class PuenteReviewTests
         Assert.Contains(h.Tts.Synthesized, t => t.Contains("aquí Syulen"));
     }
 }
+
+public class TowerDialogueTests
+{
+    private static async Task<(Harness H, DeckButton Button)> TowerAsync(string module)
+    {
+        var h = await Harness.CreateAsync();
+        await h.Session.SaveProfileAsync(h.Session.ActiveProfile!.Name, "Gatac Syulen");
+        await h.EnableCopilotAsync();
+        await h.Session.SaveSettingsAsync(h.Session.Settings with { CopilotPack = "militar" });
+        h.Tts.Seconds = 0.2;
+        return (h, h.Session.Buttons.Single(b => b.Name == module));
+    }
+
+    [Fact]
+    public async Task TakeoffRequest_TheCopilotAsks_ThenTheTowerAnswersOverTheRadio()
+    {
+        var (h, takeoff) = await TowerAsync("Takeoff Request");
+        await using var _ = h;
+
+        await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Takeoff Request"));
+        await h.Copilot.Pending;
+
+        Assert.Single(h.Sender.Sent);
+        var said = h.Log.Lines.Where(l => l.Contains(" said '")).ToList();
+        Assert.Equal(2, said.Count);
+        Assert.Contains("Copilot said", said[0]);
+        Assert.Contains("Tower said", said[1]);
+        Assert.Contains("Syulen", said[1]);
+        Assert.Contains("salida", said[1]);
+        Assert.Equal(2, h.Player.Played.Select(p => p.Path).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task AnotherOrderInBetween_SilencesTheTower()
+    {
+        var (h, hangar) = await TowerAsync("Hangar Request");
+        await using var _ = h;
+
+        await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Hangar Request"));
+        var dialogue = h.Copilot.Pending;
+        await Task.Delay(50);
+        await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Lights"));
+        await dialogue;
+        await h.Copilot.Pending;
+
+        Assert.DoesNotContain(h.Log.Lines, l => l.Contains("Tower said"));
+    }
+
+    [Fact]
+    public async Task OtherModules_GetNoTower()
+    {
+        var (h, _) = await TowerAsync("Hangar Request");
+        await using var __ = h;
+
+        await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Lights"));
+        await h.Copilot.Pending;
+
+        Assert.DoesNotContain(h.Log.Lines, l => l.Contains("Tower said"));
+    }
+
+    [Fact]
+    public async Task WarmUp_RendersTheTowerAnswersToo()
+    {
+        var (h, _) = await TowerAsync("Hangar Request");
+        await using var __ = h;
+
+        await h.Copilot.WarmUpAsync();
+
+        Assert.Contains(h.Tts.Synthesized, t => t.StartsWith("Recibido, Syulen"));
+    }
+}
+
+public class RadioEffectTests
+{
+    [Fact]
+    public void Radio_AddsSquelch_StaysInRange_AndIsRepeatable()
+    {
+        var samples = Enumerable.Range(0, 22050).Select(i => (float)Math.Sin(i * 2 * Math.PI * 440 / 22050) * 0.9f).ToArray();
+        var audio = new SpeechAudio(samples, 22050);
+
+        var radio = RadioEffect.Apply(audio);
+
+        Assert.True(radio.Samples.Length > samples.Length);
+        Assert.All(radio.Samples, s => Assert.InRange(s, -1f, 1f));
+        Assert.Equal(radio.Samples, RadioEffect.Apply(audio).Samples);
+    }
+}
+
+public class HoldTests
+{
+    [Fact]
+    public async Task QuantumMode_HoldsTheKey_OnANewDeck()
+    {
+        await using var h = await Harness.CreateAsync();
+
+        Assert.Equal(1000, h.Session.Buttons.Single(b => b.Name == "Quantum Mode").Action.PressDurationMs);
+    }
+
+    [Fact]
+    public async Task OldQuantumTap_IsUpgraded_ButAChangedOneIsLeftAlone()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        await db.ExecuteAsync("UPDATE Buttons SET PressDurationMs=60 WHERE Name='Quantum Mode'; UPDATE Buttons SET PressDurationMs=60, ActionKey='F9' WHERE Name='Star Map'; DELETE FROM Settings WHERE Key='AtcPhrasesV2';");
+
+        var again = new SqliteVerseDeckRepository(db.Path);
+        await again.InitializeAsync();
+        var profile = (await again.GetProfilesAsync()).Single(p => p.IsActive);
+        var buttons = await again.GetButtonsAsync(profile.Id);
+
+        Assert.Equal(1000, buttons.Single(b => b.Name == "Quantum Mode").Action.PressDurationMs);
+        Assert.Equal(60, buttons.Single(b => b.Name == "Star Map").Action.PressDurationMs);
+    }
+
+    [Fact]
+    public async Task OldTowerModules_GetTheNewPhrases_Once()
+    {
+        await using var db = new TempDatabase();
+        var repository = await db.CreateAsync();
+        await db.ExecuteAsync("DELETE FROM VoiceCommands WHERE Phrase IN ('salida de hangar', 'abrir hangar'); DELETE FROM Settings WHERE Key='AtcPhrasesV2';");
+
+        var again = new SqliteVerseDeckRepository(db.Path);
+        await again.InitializeAsync();
+        await again.InitializeAsync();
+
+        var phrases = (await again.GetVoiceCommandsAsync()).Select(v => v.Phrase).ToList();
+        Assert.Single(phrases, p => p == "salida de hangar");
+        Assert.Single(phrases, p => p == "abrir hangar");
+    }
+
+    [Fact]
+    public async Task Editor_SavesTheChosenHold()
+    {
+        await using var h = await Harness.CreateAsync();
+        h.Shell.Deck.IsEditMode = true;
+        await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Star Map"));
+        var editor = h.Shell.Editor;
+
+        editor.Hold = VerseDeck.App.ViewModels.ModuleEditorViewModel.HoldChoices.Single(c => c.Ms == 1500);
+        await editor.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(1500, h.Session.Buttons.Single(b => b.Name == "Star Map").Action.PressDurationMs);
+    }
+}

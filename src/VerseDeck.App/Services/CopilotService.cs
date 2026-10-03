@@ -191,7 +191,7 @@ public sealed class CopilotService
         _selector = new ResponseSelector(packs[0], new Random());
 
         executor.WillBeAnswered = WillAnswer;
-        executor.Sent += (_, e) => Answer(e, () => _selector.ForModule(e.Button));
+        executor.Sent += (_, e) => Answer(e, () => _selector.ForModule(e.Button), withTower: true);
         executor.Failed += (_, e) => Answer(e, () => _selector.Failed());
         executor.Blocked += (_, e) => Answer(e, () => _selector.NoKey());
         _session.Changed += (_, _) => OnSessionChanged();
@@ -282,13 +282,52 @@ public sealed class CopilotService
     public Task TestAsync() => SayAsync(TestPhrase, force: true);
 
     /// <param name="whenReady">Say it however long it takes: for announcements that are not an answer to a key press.</param>
-    public async Task SayAsync(string text, bool force = false, bool whenReady = false)
+    public Task SayAsync(string text, bool force = false, bool whenReady = false) => SpeakAsync(text, ActiveVoice, false, force, whenReady);
+
+    /// <summary>The control tower's voice: another installed voice when there is one, so two people seem to talk.</summary>
+    public VoiceInfo? TowerVoice
     {
-        var voice = ActiveVoice;
-        if (voice is null || (Muted && !force))
+        get
+        {
+            var active = ActiveVoice;
+            return active is null ? null : InstalledVoices.FirstOrDefault(v => v.Id != active.Id) ?? active;
+        }
+    }
+
+    // A short breath between the copilot's request and the tower's answer.
+    private static readonly TimeSpan TowerPause = TimeSpan.FromMilliseconds(450);
+
+    // Tower phrases are stored apart: the same words over the radio are a different sound.
+    private const string RadioTag = "[radio] ";
+
+    /// <summary>The copilot asks, then the tower answers over the radio, unless something newer was said in between.</summary>
+    private async Task DialogueAsync(string request, string answer)
+    {
+        var said = await SpeakAsync(request, ActiveVoice, false, false, false);
+        if (said is null)
         {
             return;
         }
+
+        var turn = Volatile.Read(ref _sequence);
+        await Task.Delay(said.Duration + TowerPause);
+        if (turn != Volatile.Read(ref _sequence) || Muted)
+        {
+            return;
+        }
+
+        await SpeakAsync(answer, TowerVoice, true, false, true);
+    }
+
+    /// <returns>What was played, or null when nothing was.</returns>
+    private async Task<CachedPhrase?> SpeakAsync(string text, VoiceInfo? voice, bool radio, bool force, bool whenReady)
+    {
+        if (voice is null || (Muted && !force))
+        {
+            return null;
+        }
+
+        var key = radio ? RadioTag + text : text;
 
         // Only the most recent phrase may sound. An older one still being synthesized is abandoned.
         var mine = Interlocked.Increment(ref _sequence);
@@ -297,14 +336,14 @@ public sealed class CopilotService
         var asked = _clock();
         try
         {
-            var phrase = _cache.TryGet(voice, text);
+            var phrase = _cache.TryGet(voice, key);
             var source = phrase is null ? "generated" : "cache";
             if (phrase is null)
             {
                 try
                 {
                     var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
-                    phrase = _cache.Store(voice, text, audio);
+                    phrase = _cache.Store(voice, key, radio ? RadioEffect.Apply(audio) : audio);
                 }
                 finally
                 {
@@ -315,27 +354,30 @@ public sealed class CopilotService
 
             if (mine != Volatile.Read(ref _sequence) || (Muted && !force))
             {
-                return;
+                return null;
             }
 
             var now = _clock();
             if (!whenReady && now - asked > TooLate)
             {
                 _log.Write($"Copilot kept '{text}' for next time: it was ready {(now - asked).TotalSeconds:0.0} s after the action");
-                return;
+                return null;
             }
 
             _player.Play(phrase.Path, _session.Settings.CopilotVolume);
             _guard.Speaking(now, now + phrase.Duration + EchoMargin);
-            _log.Write($"Copilot said '{text}' ({source})");
+            _log.Write(radio ? $"Tower said '{text}' ({source}, {voice.Id})" : $"Copilot said '{text}' ({source})");
+            return phrase;
         }
         catch (OperationCanceledException)
         {
             // A newer phrase or the mute switch took over.
+            return null;
         }
         catch (Exception ex)
         {
             _log.Write($"Copilot could not say '{text}': {ex.Message}");
+            return null;
         }
     }
 
@@ -351,10 +393,16 @@ public sealed class CopilotService
         _warmUp?.Cancel();
         var cancellation = _warmUp = new CancellationTokenSource();
         UseCurrentPack();
-        var wanted = _selector.AllFor(_session.Buttons).Concat(ExtraPhrases?.Invoke() ?? []).Distinct().ToList();
-        var missing = wanted.Count(text => _cache.TryGet(voice, text) is null);
+        // The copilot's lines, then the tower's answers in its own voice over the radio: grouped by voice so
+        // each model is loaded once.
+        var tower = TowerVoice ?? voice;
+        var wanted = _selector.AllFor(_session.Buttons).Concat(ExtraPhrases?.Invoke() ?? []).Distinct()
+            .Select(text => (Voice: voice, Text: text, Key: text, Radio: false))
+            .Concat(_selector.AllTowerFor(_session.Buttons).Select(text => (Voice: tower, Text: text, Key: RadioTag + text, Radio: true)))
+            .ToList();
+        var missing = wanted.Count(item => _cache.TryGet(item.Voice, item.Key) is null);
         var done = 0;
-        foreach (var text in wanted)
+        foreach (var item in wanted)
         {
             if (cancellation.IsCancellationRequested)
             {
@@ -362,17 +410,18 @@ public sealed class CopilotService
             }
 
             // Checked again here: a press may have cached the phrase while the warm-up was running.
-            if (_cache.TryGet(voice, text) is not null)
+            if (_cache.TryGet(item.Voice, item.Key) is not null)
             {
                 continue;
             }
 
+            var text = item.Text;
             WarmUpStatus = $"Generando frases: {++done} de {missing}";
             Changed?.Invoke(this, EventArgs.Empty);
             try
             {
-                var audio = await _engine.SynthesizeAsync(voice, text, cancellation.Token);
-                _cache.Store(voice, text, audio);
+                var audio = await _engine.SynthesizeAsync(item.Voice, text, cancellation.Token);
+                _cache.Store(item.Voice, item.Key, item.Radio ? RadioEffect.Apply(audio) : audio);
             }
             catch (OperationCanceledException)
             {
@@ -422,7 +471,7 @@ public sealed class CopilotService
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Answer(ExecutedEventArgs e, Func<string?> phrase)
+    private void Answer(ExecutedEventArgs e, Func<string?> phrase, bool withTower = false)
     {
         if (!WillAnswer(e.Button, e.Source))
         {
@@ -430,10 +479,14 @@ public sealed class CopilotService
         }
 
         UseCurrentPack();
-        if (phrase() is { } text)
+        if (phrase() is not { } text)
         {
-            Pending = SayAsync(text);
+            return;
         }
+
+        // Only a request that was really sent gets an answer from the tower.
+        var answer = withTower ? _selector.TowerFor(e.Button) : null;
+        Pending = answer is null ? SayAsync(text) : DialogueAsync(text, answer);
     }
 
     private void OnSessionChanged()

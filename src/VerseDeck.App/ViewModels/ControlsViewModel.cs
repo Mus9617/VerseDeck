@@ -14,6 +14,8 @@ public sealed record PresetLinkRow(string Module, string Action, string CurrentK
 
 public sealed record GameActionChoice(string Id, string Label);
 
+public sealed record HoldChoice(string Label, int Ms);
+
 public static class BindStatusText
 {
     public static string Text(BindStatus status, string gameVersion) => status switch

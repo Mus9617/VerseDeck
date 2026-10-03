@@ -262,7 +262,7 @@ public class ControlsViewModelReviewTests
     {
         await using var h = await Harness.CreateAsync();
         await h.Shell.Controls.LinkPresetsCommand.ExecuteAsync(null);
-        Assert.Equal(600, h.Session.Buttons.First(b => b.Name == "Quantum Mode").Action.PressDurationMs);
+        Assert.Equal(1000, h.Session.Buttons.First(b => b.Name == "Quantum Mode").Action.PressDurationMs);
         h.Shell.Deck.IsEditMode = true;
         await h.Shell.Deck.PressCommand.ExecuteAsync(h.Tile("Quantum Mode"));
         var editor = h.Shell.Editor;
